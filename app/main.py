@@ -12,8 +12,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import config, db, security
 from .routers import audit as audit_router
-from .routers import (auth, dashboard, licenses, models, search, server_items, servers, services, tags,
-                      users)
+from .routers import (acls, auth, dashboard, exports, licenses, models, search, server_import, server_items, servers,
+                      services, tags, users)
 from .security import LoginRequired, PasswordChangeRequired, safe_redirect_path
 from .templating import render
 
@@ -84,6 +84,9 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError):
+        # 경로 파라미터(예: /servers/abc)가 형식에 맞지 않으면 그런 리소스는 없는 것이므로 404로 응답한다.
+        if all(err["loc"] and err["loc"][0] == "path" for err in exc.errors()):
+            return error_response(request, 404)
         return error_response(request, 422)
 
     @app.exception_handler(LoginRequired)
@@ -109,6 +112,9 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(dashboard.router)
     app.include_router(users.router)
+    app.include_router(exports.router)
+    app.include_router(acls.router)
+    app.include_router(server_import.router)
     app.include_router(servers.router)
     app.include_router(servers.common_router)
     app.include_router(server_items.router)

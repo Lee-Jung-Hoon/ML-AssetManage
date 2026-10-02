@@ -213,3 +213,11 @@
 {% macro risk_badge(risk) -%}
 {% if risk == "risk" %}{{ badge("라이선스 위험", "red") }}{% elif risk == "conditional" %}{{ badge("조건 확인", "orange") }}{% endif %}
 {%- endmacro %}
+
+{# CSV 내보내기 버튼 (editor 이상). 현재 적용된 필터를 쿼리스트링으로 그대로 전달한다 (POST + CSRF). #}
+{% macro export_form(path, query, token) -%}
+<form method="post" action="{{ path }}{% if query %}?{{ query | urlencode }}{% endif %}" class="inline-form">
+  {{ csrf_input(token) }}
+  <button type="submit" class="secondary">CSV 내보내기</button>
+</form>
+{%- endmacro %}

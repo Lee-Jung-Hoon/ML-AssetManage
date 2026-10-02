@@ -81,3 +81,5 @@ a.button.secondary { background: #fff; color: #1f2933; border: 1px solid #b8c2cc
 .inline-form { display: inline; margin: 0; }
 .inline-form button { padding: 2px 8px; font-size: 12px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.code-block { background: #1f2933; color: #e8eef5; padding: 10px 12px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+[hidden] { display: none !important; }

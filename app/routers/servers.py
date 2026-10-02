@@ -39,6 +39,9 @@ _ORDER = {
 }
 
 
+_ORDER_ALL = {key: value.replace(" LIMIT ? OFFSET ?", "") for key, value in _ORDER.items()}   # CSV는 페이지네이션 없이 전체
+
+
 def server_conditions(flt: ServerFilter, user: CurrentUser) -> list[tuple[str, tuple]]:
     """목록/CSV 내보내기가 함께 쓰는 필터 조건. 조각은 코드 상수이고 값만 바인딩한다."""
     c: list[tuple[str, tuple]] = []
@@ -138,6 +141,16 @@ def _validate(conn: sqlite3.Connection, form: dict, current: sqlite3.Row | None)
     return data, errors
 
 
+def insert_server(conn: sqlite3.Connection, fields: dict, user_id: int, now: str) -> int:
+    """서버 기본 정보를 INSERT한다 (단건 등록과 CSV 일괄 등록이 함께 쓴다). 호출자의 트랜잭션 안에서 실행."""
+    return conn.execute(
+        "INSERT INTO servers (name, hostname, os_type, os_distro, os_version, kernel_version, environment, "
+        "status, server_type, location, cpu_model, cpu_cores, memory_gb, description, notes, owner_id, "
+        "created_at, created_by, updated_at, updated_by) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (*(fields[f] for f in FIELDS), now, user_id, now, user_id)).lastrowid
+
+
 def _field_values(data: ServerForm) -> dict:
     return {f: getattr(data, f) for f in FIELDS}
 
@@ -150,12 +163,7 @@ def server_create(request: Request, user: CurrentUser = Depends(require_role("ed
         return render(request, "servers/form.html", _form_context(conn, None, form, errors), 422)
     fields, now = _field_values(data), now_iso()
     with transaction(conn):
-        server_id = conn.execute(
-            "INSERT INTO servers (name, hostname, os_type, os_distro, os_version, kernel_version, environment, "
-            "status, server_type, location, cpu_model, cpu_cores, memory_gb, description, notes, owner_id, "
-            "created_at, created_by, updated_at, updated_by) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (*fields.values(), now, user.id, now, user.id)).lastrowid
+        server_id = insert_server(conn, fields, user.id, now)
         assets.set_tags(conn, "server", server_id, data.tags)
         audit.record(conn, request, "server_create", user=user, target_type="server", target_id=server_id,
                      summary=audit.diff_summary({}, {**fields, "tags": ", ".join(data.tags)}))

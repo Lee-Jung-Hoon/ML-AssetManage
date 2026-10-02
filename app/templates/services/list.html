@@ -5,7 +5,7 @@
 <div class="page-head">
   <h1>서비스</h1>
   <div class="actions">
-    {% if user.role in ("editor", "admin") %}<a class="button" href="/services/new">서비스 등록</a>{% endif %}
+    {% if user.role in ("editor", "admin") %}{{ m.export_form("/services/export", query, csrf_token) }}<a class="button" href="/services/new">서비스 등록</a>{% endif %}
   </div>
 </div>
 {% if errors %}<div class="flash flash-error" role="alert">조회 조건이 올바르지 않습니다. 표시된 항목을 확인하세요.</div>{% endif %}

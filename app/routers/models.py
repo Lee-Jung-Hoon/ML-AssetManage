@@ -36,6 +36,7 @@ _ORDER = {
     "updated": "ORDER BY m.updated_at DESC, m.id LIMIT ? OFFSET ?",
     "verified": "ORDER BY m.last_verified_at IS NULL DESC, m.last_verified_at, m.id LIMIT ? OFFSET ?",
 }
+_ORDER_ALL = {key: value.replace(" LIMIT ? OFFSET ?", "") for key, value in _ORDER.items()}   # CSV는 전체 결과
 COMMERCIAL_BADGE = {"가능": "green", "조건부": "orange", "불가": "red", "미확인": "orange"}
 
 

@@ -789,3 +789,14 @@ def _single_tag(value: str) -> str:
 
 class TagRenameForm(FormModel):
     name: Annotated[str, Field(min_length=1, max_length=60), AfterValidator(_single_tag)]
+
+
+class AclFilter(FormModel):
+    q: str = Field(default="", max_length=100)
+    status: opt_choice(*ACL_STATUSES) = ""
+    direction: opt_choice(*ACL_DIRECTIONS) = ""
+    page: int = Field(default=1, ge=1, le=100000)
+
+
+class ImportForm(FormModel):
+    csv: str = Field(default="", max_length=1_000_000)

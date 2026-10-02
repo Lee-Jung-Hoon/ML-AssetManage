@@ -49,6 +49,8 @@ _ORDER = {
     "verified": "ORDER BY l.last_verified_at IS NULL DESC, l.last_verified_at, l.id LIMIT ? OFFSET ?",
 }
 
+_ORDER_ALL = {key: value.replace(" LIMIT ? OFFSET ?", "") for key, value in _ORDER.items()}   # CSV는 전체 결과
+
 
 def license_conditions(flt: LicenseFilter, user: CurrentUser, today: str) -> list[tuple[str, tuple]]:
     c: list[tuple[str, tuple]] = []
