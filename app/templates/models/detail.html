@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}{{ m_.name }} {{ m_.version }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ m_.name }} <small class="muted">{{ m_.version }}</small></h1>
+  <div class="actions">
+    {% if can_write %}
+    {{ m.verify_form("/models/%d/verify" % m_.id, csrf_token) }}
+    <a class="button" href="/models/{{ m_.id }}/edit">수정</a>
+    <a class="button secondary" href="/models/{{ m_.id }}/delete">삭제</a>
+    {% endif %}
+    <a class="button secondary" href="/models">목록</a>
+  </div>
+</div>
+
+<section class="section">
+  <h2>기본 정보</h2>
+  <dl class="detail-grid">
+    <dt>상태</dt><dd>{{ m.badge(m_.status, {"운영": "green", "스테이징": "orange", "실험": "gray", "폐기": "gray"}[m_.status]) }} {{ m_.model_type }} · {{ m_.source }}</dd>
+    <dt>베이스 모델</dt><dd>{{ m_.base_model }}</dd>
+    <dt>용도 설명</dt><dd class="pre">{{ m_.description }}</dd>
+    <dt>규모</dt><dd>{{ m_.param_size }}{% if m_.vram_gb %} · 서빙 VRAM {{ m_.vram_gb }} GB{% endif %}</dd>
+    <dt>저장 위치</dt><dd>{{ m_.storage_location }}</dd>
+    <dt>실험/학습 기록</dt><dd>{{ m.url_link(m_.experiment_url) }}</dd>
+    <dt>모델 카드/문서</dt><dd>{{ m.url_link(m_.card_url) }}</dd>
+    <dt>담당자</dt><dd>{{ m.owner_cell(m_.owner_name, m_.owner_active) }}</dd>
+    <dt>태그</dt><dd>{{ m.tag_list(tags) }}</dd>
+    <dt>최신성</dt><dd>{{ m.verify_badge(m_.last_verified_at) }}{% if m_.verified_by_name %} <span class="muted">({{ m_.verified_by_name }}, {{ m_.last_verified_at | kst }})</span>{% endif %}</dd>
+    <dt>생성</dt><dd>{{ m_.created_at | kst }} · {{ m_.created_by_name }}</dd>
+    <dt>수정</dt><dd>{{ m_.updated_at | kst }} · {{ m_.updated_by_name }}</dd>
+  </dl>
+</section>
+
+<section class="section" id="license">
+  <h2>라이선스 조건</h2>
+  <dl class="detail-grid">
+    <dt>모델 라이선스</dt><dd>{{ m_.model_license }}</dd>
+    <dt>상업 이용</dt><dd>{{ m.commercial_badge(m_.commercial_use) }} {{ m.risk_badge(risk) }}</dd>
+    <dt>조건 메모</dt><dd class="pre">{{ m_.license_note }}</dd>
+  </dl>
+  {% if risk == "risk" %}
+  <div class="warn-box" role="alert">상업 이용이 '{{ m_.commercial_use }}'인데 {% if m_.status == "운영" %}운영 상태입니다{% else %}prod 환경의 운영중 서비스에 연결되어 있습니다{% endif %}. 라이선스 조건을 확인하세요.</div>
+  {% endif %}
+</section>
+
+{% if m_.source == "상용 API" %}
+<section class="section" id="api">
+  <h2>연결된 AI API</h2>
+  {% if m_.license_id %}
+  <p><a href="/licenses/{{ m_.license_id }}">{{ m_.license_name }}</a> ({{ m_.license_provider }}) {{ m.policy_badge(api_policy_risk) }}</p>
+  {% else %}<p class="muted">연결된 AI API 라이선스가 없습니다.</p>{% endif %}
+</section>
+{% endif %}
+
+<section class="section" id="services">
+  <div class="page-head"><h2>사용 서비스 ({{ services | length }})</h2>
+    {% if can_write %}<a class="button secondary" href="/models/{{ m_.id }}/services/new">서비스 연결</a>{% endif %}</div>
+  {% if services %}
+  <table>
+    <thead><tr><th>서비스</th><th>환경</th><th>중요도</th><th>상태</th><th>용도</th>{% if can_write %}<th></th>{% endif %}</tr></thead>
+    <tbody>{% for sv in services %}
+      <tr><td><a href="/services/{{ sv.id }}">{{ sv.name }}</a> <span class="muted">({{ sv.code }})</span></td>
+          <td>{{ m.badge(sv.environment, "gray") }}</td><td>{{ m.tier_badge(sv.tier) }}</td><td>{{ sv.status }}</td><td>{{ sv.note }}</td>
+          {% if can_write %}<td><a href="/models/{{ m_.id }}/services/{{ sv.id }}/edit">수정</a></td>{% endif %}</tr>
+    {% endfor %}</tbody>
+  </table>
+  {% else %}<p class="muted">이 모델을 사용하는 서비스가 없습니다.</p>{% endif %}
+</section>
+
+{{ m.notes_section(notes, "/models/%d" % m_.id, can_write, user, csrf_token, today) }}
+{{ m.history_section(history) }}
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}AI 모델 삭제{% endblock %}
+{% block content %}
+<h1>AI 모델 삭제</h1>
+<p><strong>{{ m_.name }} {{ m_.version }}</strong>을(를) 삭제합니다. 서비스 연결과 태그·운영 메모도 함께 삭제되며 되돌릴 수 없습니다. 변경 이력(감사 로그)은 남습니다.</p>
+{% if services %}
+<div class="warn-box" role="alert">
+  <strong>이 모델을 사용하는 서비스가 {{ services | length }}개 있습니다.</strong> 삭제하면 해당 서비스와의 연결이 끊어집니다.
+  <ul>{% for sv in services %}<li><a href="/services/{{ sv.id }}">{{ sv.name }}</a> ({{ sv.code }}) {{ m.tier_badge(sv.tier) }} · {{ sv.status }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+<form method="post" action="/models/{{ m_.id }}/delete" class="actions">
+  {{ m.csrf_input(csrf_token) }}
+  <button type="submit" class="danger">삭제</button>
+  <a class="button secondary" href="/models/{{ m_.id }}">취소</a>
+</form>
+{% endblock %}

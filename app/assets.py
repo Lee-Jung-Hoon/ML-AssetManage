@@ -216,3 +216,23 @@ def license_status(expires_at: str | None, no_expiry: bool, alert_days: int, tod
 def data_policy_risk(sends_customer_data: str | None, training_opt_out: str | None) -> bool:
     """고객 데이터를 전송하는 AI API인데 학습 활용 거부(opt-out)가 미설정/미확인이면 위험."""
     return sends_customer_data == "예" and training_opt_out in ("미설정", "미확인")
+
+
+# ------------------------------------------------------------------ AI 모델 라이선스 위험 (저장하지 않고 조회 시 계산)
+
+# prod 환경의 운영중 서비스에 연결되어 있는지 (모델 테이블 별칭 m 기준). 목록/필터/대시보드가 같은 조각을 쓴다.
+MODEL_PROD_LINKED_SQL = (
+    "EXISTS (SELECT 1 FROM model_services ms JOIN services s ON s.id = ms.service_id "
+    "WHERE ms.model_id = m.id AND s.environment = 'prod' AND s.status = '운영중')"
+)
+# 라이선스 위험: 상업 이용이 불가/미확인이면서 (모델 상태가 운영이거나 prod 운영중 서비스에 연결된 경우)
+MODEL_RISK_SQL = f"(m.commercial_use IN ('불가', '미확인') AND (m.status = '운영' OR {MODEL_PROD_LINKED_SQL}))"
+
+
+def license_risk(commercial_use: str, status: str, prod_linked: bool) -> str | None:
+    """'risk'(빨강 라이선스 위험) / 'conditional'(주황 조건 확인) / None."""
+    if commercial_use in ("불가", "미확인") and (status == "운영" or prod_linked):
+        return "risk"
+    if commercial_use == "조건부":
+        return "conditional"
+    return None

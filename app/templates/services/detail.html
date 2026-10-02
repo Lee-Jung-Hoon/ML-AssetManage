@@ -96,6 +96,19 @@
   {% else %}<p class="muted">이 서비스에 의존하는 서비스가 없습니다.</p>{% endif %}
 </section>
 
+<section class="section" id="models">
+  <h2>사용 AI 모델 ({{ models | length }})</h2>
+  {% if models %}
+  <table>
+    <thead><tr><th>모델</th><th>버전</th><th>상태</th><th>상업 이용</th><th>용도</th></tr></thead>
+    <tbody>{% for mdl in models %}
+      <tr><td><a href="/models/{{ mdl.id }}">{{ mdl.name }}</a></td><td>{{ mdl.version }}</td><td>{{ mdl.status }}</td>
+          <td>{{ m.commercial_badge(mdl.commercial_use) }} {{ m.risk_badge(mdl.risk) }}</td><td>{{ mdl.note }}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+  {% else %}<p class="muted">이 서비스가 사용하는 AI 모델이 없습니다.</p>{% endif %}
+</section>
+
 <section class="section" id="licenses">
   <h2>연결된 라이선스 ({{ licenses | length }})</h2>
   {% if licenses %}

@@ -204,3 +204,12 @@
 {% macro policy_badge(risk) -%}
 {% if risk %}{{ badge("데이터 정책 확인", "red") }}{% endif %}
 {%- endmacro %}
+
+{# AI 모델 상업 이용 / 라이선스 위험 배지 (위험=빨강, 조건 확인=주황) #}
+{% macro commercial_badge(value) -%}
+{{ badge("상업 이용 " ~ value, {"가능": "green", "조건부": "orange", "불가": "red", "미확인": "orange"}[value]) }}
+{%- endmacro %}
+
+{% macro risk_badge(risk) -%}
+{% if risk == "risk" %}{{ badge("라이선스 위험", "red") }}{% elif risk == "conditional" %}{{ badge("조건 확인", "orange") }}{% endif %}
+{%- endmacro %}

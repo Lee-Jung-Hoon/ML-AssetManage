@@ -693,3 +693,80 @@ class LicenseServerForm(FormModel):
 
 class LicenseServiceForm(FormModel):
     service_id: int = Field(ge=1)
+
+
+# ------------------------------------------------------------------ AI 모델 (9단계)
+MODEL_TYPES = ("LLM", "임베딩", "비전", "음성", "분류·예측", "추천", "기타")
+MODEL_SOURCES = ("자체 학습", "파인튜닝", "오픈소스", "상용 API")
+MODEL_STATUSES = ("실험", "스테이징", "운영", "폐기")
+COMMERCIAL_USES = ("가능", "조건부", "불가", "미확인")
+MODEL_LICENSES = ("Apache-2.0", "MIT", "Llama Community", "Gemma Terms", "CC-BY", "CC-BY-NC", "상용 계약", "자체 소유",
+                  "기타")
+API_SOURCE = "상용 API"
+
+
+def _plain_text(value: str) -> str:
+    """저장 위치 등: s3:// 같은 다른 스킴도 허용하되 링크가 아닌 일반 텍스트로만 표시한다. 제어 문자만 거부."""
+    if any(ord(c) < 0x20 or ord(c) == 0x7F for c in value):
+        raise ValueError("줄바꿈이나 제어 문자를 넣을 수 없습니다.")
+    return value
+
+
+class ModelForm(FormModel):
+    name: str = Field(min_length=1, max_length=100)
+    version: str = Field(min_length=1, max_length=50)
+    model_type: Literal[*MODEL_TYPES]
+    source: Literal[*MODEL_SOURCES]
+    base_model: str = Field(default="", max_length=200, validate_default=True)
+    model_license: str = Field(default="", max_length=100)
+    commercial_use: Literal[*COMMERCIAL_USES] = "미확인"
+    license_note: Annotated[str, AfterValidator(_multiline)] = Field(default="", max_length=2000)
+    description: Annotated[str, AfterValidator(_multiline)] = Field(min_length=1, max_length=4000)
+    status: Literal[*MODEL_STATUSES]
+    param_size: str = Field(default="", max_length=30)
+    vram_gb: opt_int(1, 100000) = None
+    storage_location: Annotated[str, AfterValidator(_plain_text)] = Field(default="", max_length=500)
+    experiment_url: HttpUrl = ""
+    card_url: HttpUrl = ""
+    license_id: OptInt = Field(default=None, validate_default=True)
+    owner_id: OptInt = None
+    tags: Tags = []
+
+    @field_validator("base_model")
+    @classmethod
+    def _base_model_required(cls, v: str, info) -> str:
+        if info.data.get("source") in ("파인튜닝", "오픈소스") and not v:
+            raise ValueError("출처가 파인튜닝/오픈소스이면 베이스 모델이 필요합니다.")
+        return v
+
+    @field_validator("license_id")
+    @classmethod
+    def _api_license_only_for_commercial_api(cls, v, info):
+        # 상용 API 연결은 출처가 '상용 API'일 때만 허용하고, 다른 출처에서는 거부한다.
+        if v is not None and info.data.get("source") != API_SOURCE:
+            raise ValueError("출처가 '상용 API'일 때만 AI API 라이선스를 연결할 수 있습니다.")
+        return v
+
+
+class ModelFilter(FormModel):
+    q: str = Field(default="", max_length=100)
+    model_type: opt_choice(*MODEL_TYPES) = ""
+    source: opt_choice(*MODEL_SOURCES) = ""
+    status: opt_choice(*MODEL_STATUSES) = ""
+    commercial_use: opt_choice(*COMMERCIAL_USES) = ""
+    risk: Flag = False
+    tag: str = Field(default="", max_length=30)
+    owner_id: OptInt = None
+    mine: Flag = False
+    stale: Flag = False
+    sort: Literal["name", "updated", "verified"] = "name"
+    page: int = Field(default=1, ge=1, le=100000)
+
+
+class ModelServiceCreateForm(FormModel):
+    service_id: int = Field(ge=1)
+    note: str = Field(default="", max_length=500)
+
+
+class ModelServiceEditForm(FormModel):
+    note: str = Field(default="", max_length=500)
