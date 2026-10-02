@@ -113,10 +113,6 @@ def make_test_app():
     def boom():
         raise RuntimeError("secret-internal-detail")
 
-    @router.get("/password")
-    def password_page():
-        return PlainTextResponse("password-page")
-
     app.include_router(router)
     return app
 

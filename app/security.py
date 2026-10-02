@@ -3,6 +3,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import sqlite3
@@ -16,7 +17,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi import Depends, HTTPException, Request, Response
 
 from . import config
-from .db import get_db, now_iso, parse_iso
+from .db import get_db, now_iso, parse_iso, transaction
 
 # ------------------------------------------------------------------ 비밀번호
 
@@ -141,6 +142,18 @@ login_limiter = LoginLimiter()
 
 def _account_key(username: str) -> str:
     return "u:" + username.strip().casefold()[:64]
+
+
+def is_account_locked(username: str) -> bool:
+    return login_limiter.is_locked(_account_key(username))
+
+
+def record_account_failure(username: str) -> None:
+    login_limiter.record_failure(_account_key(username))
+
+
+def reset_account_failures(username: str) -> None:
+    login_limiter.reset(_account_key(username))
 
 
 def admin_enabled() -> bool:
@@ -388,3 +401,60 @@ def decrypt_field(key: bytes, record_id: int, field: str, blob: bytes) -> str:
 
 def mask_secret(plaintext: str) -> str:
     return "****" + plaintext[-4:] if len(plaintext) > 8 else "********"
+
+
+# ------------------------------------------------------------------ 관리자 부트스트랩 / 복구
+
+log = logging.getLogger("app")
+ADMIN_USERNAME = "admin"
+
+
+def _insert_admin(conn: sqlite3.Connection, password_hash: str) -> int:
+    now = now_iso()
+    return conn.execute(
+        "INSERT INTO users (username, display_name, team, role, is_active, password_hash, "
+        "must_change_password, created_at, updated_at) VALUES (?, '관리자', '', 'admin', 1, ?, 1, ?, ?)",
+        (ADMIN_USERNAME, password_hash, now, now),
+    ).lastrowid
+
+
+def bootstrap_admin(conn: sqlite3.Connection) -> str | None:
+    """첫 기동 시 admin 계정이 없으면 랜덤 비밀번호로 만든다. 생성했으면 비밀번호를, 아니면 None을 반환한다."""
+    from .audit import record      # 순환 import 방지 (audit이 security를 import)
+    if conn.execute("SELECT 1 FROM users WHERE role = 'admin' OR username = ? LIMIT 1", (ADMIN_USERNAME,)).fetchone():
+        if not conn.execute("SELECT 1 FROM users WHERE role = 'admin'").fetchone():
+            log.warning("admin 역할 계정이 없습니다. `python -m app reset-admin`으로 복구하세요.")
+        return None
+    password = random_password()
+    new_hash = hash_password(password)       # 트랜잭션 밖에서 계산
+    with transaction(conn):
+        uid = _insert_admin(conn, new_hash)
+        record(conn, None, "bootstrap_admin", username="(system)", target_type="user", target_id=uid,
+               summary="초기 admin 계정 생성")
+    return password
+
+
+def reset_admin(conn: sqlite3.Connection) -> str:
+    """admin 비밀번호를 새 랜덤값으로 재설정(복구)하고 새 비밀번호를 반환한다.
+
+    계정이 없으면 만들고, 비활성/강등 상태면 admin 역할·활성으로 되돌린다. 모든 세션을 파기하고 감사 로그를 남긴다.
+    ADMIN_ENABLED와 무관하게 동작한다.
+    """
+    from .audit import record
+    password = random_password()
+    new_hash = hash_password(password)
+    with transaction(conn):
+        row = conn.execute("SELECT id, role, is_active FROM users WHERE username = ?", (ADMIN_USERNAME,)).fetchone()
+        if row is None:
+            uid, note = _insert_admin(conn, new_hash), "admin 계정 새로 생성"
+        else:
+            uid = row["id"]
+            note = "비밀번호 재설정"
+            if row["role"] != "admin" or not row["is_active"]:
+                note += " (admin 역할·활성 상태로 복구)"
+            conn.execute(
+                "UPDATE users SET password_hash = ?, role = 'admin', is_active = 1, must_change_password = 1, "
+                "updated_at = ? WHERE id = ?", (new_hash, now_iso(), uid))
+        conn.execute("DELETE FROM sessions WHERE user_id = ?", (uid,))
+        record(conn, None, "reset_admin", username="(cli)", target_type="user", target_id=uid, summary=note)
+    return password

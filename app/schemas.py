@@ -1,7 +1,7 @@
 """Pydantic 입력 모델 공통 기반. 모든 폼 모델은 FormModel을 상속한다 (extra="forbid")."""
 from typing import Annotated, Any
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, ValidationError
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError
 
 
 class FormModel(BaseModel):
@@ -55,3 +55,20 @@ def validate_form[T: FormModel](model: type[T], data: dict[str, str]) -> tuple[T
             field = str(err["loc"][0]) if err["loc"] else "__all__"
             errors.setdefault(field, _message(err))
         return None, errors
+
+
+class SecretFormModel(FormModel):
+    """비밀번호가 들어 있는 폼. 공백을 자르지 않는다 (비밀번호의 앞뒤 공백은 의미가 있다)."""
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=False)
+
+
+class LoginForm(SecretFormModel):
+    username: str = Field(min_length=1, max_length=50)
+    password: str = Field(min_length=1, max_length=256)
+    next: str = Field(default="", max_length=2000)
+
+
+class PasswordChangeForm(SecretFormModel):
+    current_password: str = Field(min_length=1, max_length=256)
+    new_password: str = Field(min_length=1, max_length=256)
+    new_password2: str = Field(min_length=1, max_length=256)

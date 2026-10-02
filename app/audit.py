@@ -35,12 +35,13 @@ def diff_summary(old: Mapping[str, object], new: Mapping[str, object]) -> str:
 
 
 def record(conn: sqlite3.Connection, request: Request | None, action: str, *,
-           user: CurrentUser | None = None, username: str = "",
+           user: CurrentUser | None = None, user_id: int | None = None, username: str = "",
            target_type: str = "", target_id: int | None = None, summary: str = "") -> None:
-    """호출자의 트랜잭션 안에서 실행된다. 로그인 실패처럼 사용자가 없으면 시도한 username(64자 제한)을 남긴다."""
+    """호출자의 트랜잭션 안에서 실행된다. CurrentUser가 없는 경우(로그인 직후, 실패, CLI)에는 user_id/username을 직접 받으며
+    username은 64자로 제한한다."""
     conn.execute(
         "INSERT INTO audit_logs (at, user_id, username, ip, action, target_type, target_id, summary) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (now_iso(), user.id if user else None, (user.username if user else username)[:64],
+        (now_iso(), user.id if user else user_id, (user.username if user else username)[:64],
          client_ip(request) if request else "", action, target_type, target_id, summary[:4000]),
     )

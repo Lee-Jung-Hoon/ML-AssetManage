@@ -40,3 +40,23 @@
 ### 남은 이슈
 - Starlette `httpx2` 경고 (1단계에서 기록, 변경 없음).
 - 실제 uvicorn 기동 확인은 3단계(`serve` CLI)에서 한다.
+
+## 3단계: 인증 화면, admin 부트스트랩, ADMIN_ENABLED, CLI — 완료
+- 만든 것: `app/routers/auth.py`(login/logout/password), `app/routers/dashboard.py`(자리표시자), `app/__main__.py`(serve/reset-admin/healthcheck), `login.html`, `password_change.html`, `dashboard.html`, `security.py`에 `bootstrap_admin`/`reset_admin`/계정 잠금 헬퍼, `schemas.py`에 `LoginForm`/`PasswordChangeForm`/`SecretFormModel`, `audit.record`에 `user_id` 인자, `tests/test_auth.py`
+- 테스트: `.venv/bin/python -m unittest` 116개 통과. 실제 `python -m app serve`(uvicorn)를 임시 데이터 경로로 띄워 `/healthz`, 보안 헤더, 서버 헤더 없음, `/` → `/login` 303, `/docs` 404, 초기 admin 비밀번호 1회 출력을 확인했다.
+- grep 점검(SQL 조립, 템플릿 우회, 인라인 script/style) 0건.
+
+### 주요 결정
+- **로그인 CSRF 생략(합의된 예외)**: `POST /login`은 `read_form`만 사용한다. 로그인 후 모든 POST는 `csrf_form`. README 설계 결정·체크리스트에 예외로 명시해야 한다 (14단계).
+- **로그인 실패 응답**: 사유(없는 계정/비활성/잘못된 비밀번호/잠금/admin 차단/잘못된 입력/알 수 없는 필드)와 무관하게 401 + 동일 문구. 사유는 감사 로그 `summary`에만 남긴다 (`locked`, `invalid`, `invalid_input`). 시도한 사용자명은 64자까지 기록하며 비밀번호는 기록하지 않는다.
+- **세션 고정 방지**: 로그인 시 기존 쿠키의 세션을 삭제하고 새 ID를 발급한다 (공격자가 심은 쿠키 값은 채택하지 않음).
+- **비밀번호 변경**: 현재 세션을 포함해 해당 사용자의 모든 세션을 삭제하고 새 세션을 발급한다. 새 비밀번호 해시는 트랜잭션 밖에서 계산. 현재 비밀번호 대입 공격은 로그인과 같은 계정 잠금(5회/15분)으로 제한한다. 검증 실패 재렌더링은 422.
+- **초기 admin**: `role='admin'` 또는 `username='admin'`인 계정이 하나라도 있으면 만들지 않는다. admin 이름만 있고 admin 역할이 없으면 경고만 로그하고 `reset-admin` 안내.
+- **`reset-admin`**: 계정이 없으면 생성, 비활성/강등이면 admin·활성으로 복구, 새 비밀번호 출력, 모든 세션 삭제, 감사 로그(`reset_admin`, 사용자명 `(cli)`) 기록. `ADMIN_ENABLED`와 무관. 한계: 실행 중 서버의 인메모리 로그인 잠금은 CLI가 풀 수 없다 (최대 15분 후 자동 해제).
+- **자리표시자 대시보드**: 로그인 후 이동할 `/`를 위해 최소 라우트를 두었다 (12단계에서 교체).
+- **로그 레벨**: `serve`는 `logging.basicConfig(INFO)`. 테스트 패키지는 `app` 로거를 CRITICAL로 올려 소음을 막는다 (`assertLogs`는 영향 없음).
+- 존재하지 않는 경로는 로그인 여부와 무관하게 404 (보호된 라우트만 로그인으로 리다이렉트).
+
+### 남은 이슈
+- `httpx2` deprecation 경고 (1단계 기록).
+- 비밀번호 변경 화면의 서버측 잠금 문구는 로그인 잠금과 같은 계정 카운터를 공유한다 (의도된 동작이지만 사용자 혼동 가능).

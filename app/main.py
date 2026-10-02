@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import config, db, security
+from .routers import auth, dashboard
 from .security import LoginRequired, PasswordChangeRequired, safe_redirect_path
 from .templating import render
 
@@ -55,8 +56,13 @@ async def lifespan(app: FastAPI):
     conn = db.connect()
     try:
         db.run_migrations(conn)
+        password = security.bootstrap_admin(conn)
     finally:
         conn.close()
+    if password:
+        # 초기 admin 비밀번호는 최초 생성 시 로그에 딱 한 번만 출력한다 (유일한 예외).
+        log.warning("\n%s\n  초기 관리자 계정이 생성되었습니다. 첫 로그인 시 비밀번호 변경이 강제됩니다.\n"
+                    "  사용자명: %s\n  비밀번호: %s\n%s", "=" * 60, security.ADMIN_USERNAME, password, "=" * 60)
     yield
 
 
@@ -97,6 +103,9 @@ def create_app() -> FastAPI:
         log.error("unhandled error on %s %s: %s", request.method, request.url.path, type(exc).__name__)
         return apply_security_headers(error_response(request, 500), request.url.path)
 
+    app.include_router(auth.public_router)
+    app.include_router(auth.router)
+    app.include_router(dashboard.router)
     app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
     @app.get("/healthz", response_class=PlainTextResponse)
