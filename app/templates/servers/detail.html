@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}{{ s.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ s.name }} <small class="muted">{{ s.hostname }}</small></h1>
+  <div class="actions">
+    {% if can_write %}
+    {{ m.verify_form("/servers/%d/verify" % s.id, csrf_token) }}
+    <a class="button" href="/servers/{{ s.id }}/edit">수정</a>
+    <a class="button secondary" href="/servers/{{ s.id }}/delete">삭제</a>
+    {% endif %}
+    <a class="button secondary" href="/servers">목록</a>
+  </div>
+</div>
+
+<section class="section">
+  <h2>기본 정보</h2>
+  <dl class="detail-grid">
+    <dt>상태</dt><dd>{{ m.badge(s.status, {"운영중": "green", "점검": "orange", "폐기예정": "orange", "폐기": "gray"}[s.status]) }}
+        {{ m.badge(s.environment, "gray") }} {{ s.server_type }}</dd>
+    <dt>OS</dt><dd>{{ s.os_type }}{% if s.os_distro %} / {{ s.os_distro }}{% endif %}{% if s.os_version %} {{ s.os_version }}{% endif %}</dd>
+    <dt>커널/빌드</dt><dd>{{ s.kernel_version }}</dd>
+    <dt>위치</dt><dd>{{ s.location }}</dd>
+    <dt>CPU</dt><dd>{{ s.cpu_model }}{% if s.cpu_cores %} · {{ s.cpu_cores }}코어{% endif %}</dd>
+    <dt>메모리</dt><dd>{% if s.memory_gb %}{{ s.memory_gb }} GB{% endif %}</dd>
+    <dt>담당자</dt><dd>{{ m.owner_cell(s.owner_name, s.owner_active) }}</dd>
+    <dt>태그</dt><dd>{{ m.tag_list(tags) }}</dd>
+    <dt>최신성</dt><dd>{{ m.verify_badge(s.last_verified_at) }}{% if s.verified_by_name %} <span class="muted">({{ s.verified_by_name }}, {{ s.last_verified_at | kst }})</span>{% endif %}</dd>
+    <dt>용도 설명</dt><dd class="pre">{{ s.description }}</dd>
+    <dt>비고</dt><dd class="pre">{{ s.notes }}</dd>
+    <dt>생성</dt><dd>{{ s.created_at | kst }} · {{ s.created_by_name }}</dd>
+    <dt>수정</dt><dd>{{ s.updated_at | kst }} · {{ s.updated_by_name }}</dd>
+  </dl>
+</section>
+
+{{ m.notes_section(notes, "/servers/%d" % s.id, can_write, user, csrf_token, today) }}
+{{ m.history_section(history) }}
+{% endblock %}

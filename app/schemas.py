@@ -3,7 +3,10 @@ import re
 from datetime import date
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError, field_validator
+from pydantic import (AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field, ValidationError,
+                      field_validator, model_validator)
+
+from .assets import parse_tags
 
 
 class FormModel(BaseModel):
@@ -18,6 +21,36 @@ def _blank_to_none(value: Any) -> Any:
 OptInt = Annotated[int | None, BeforeValidator(_blank_to_none)]
 OptFloat = Annotated[float | None, BeforeValidator(_blank_to_none)]
 OptDate = Annotated[date | None, BeforeValidator(_blank_to_none)]
+
+
+def opt_int(minimum: int, maximum: int):
+    """빈 입력은 None, 값이 있으면 범위를 검사한다 (Field(ge=)는 None에 적용하면 TypeError가 난다)."""
+    def check(value: int | None) -> int | None:
+        if value is not None and not minimum <= value <= maximum:
+            raise ValueError(f"{minimum}~{maximum} 사이의 숫자를 입력하세요.")
+        return value
+    return Annotated[int | None, BeforeValidator(_blank_to_none), AfterValidator(check)]
+
+
+# 쉼표로 구분한 태그 입력 → 정규화된 목록 (assets.parse_tags가 한국어 오류를 던진다)
+Tags = Annotated[list[str], BeforeValidator(parse_tags)]
+
+
+def _flag(value: Any) -> bool:
+    return value in ("1", "on", "true", True)
+
+
+# 목록 필터의 체크박스 (쿼리스트링 ?gpu_only=1)
+Flag = Annotated[bool, BeforeValidator(_flag)]
+
+
+def opt_choice(*allowed: str):
+    """빈 값('')이거나 허용 목록에 있는 값만 통과하는 필터용 문자열."""
+    def check(value: str) -> str:
+        if value != "" and value not in allowed:
+            raise ValueError("허용되지 않는 값입니다.")
+        return value
+    return Annotated[str, AfterValidator(check)]
 # 체크박스는 체크된 경우에만 전송된다 (미전송 = False).
 Checkbox = Annotated[bool, BeforeValidator(lambda v: v in ("on", "1", "true", True))]
 
@@ -111,3 +144,71 @@ class AuditFilter(FormModel):
     action: str = Field(default="", max_length=50)
     target_type: str = Field(default="", max_length=30)
     page: int = Field(default=1, ge=1, le=100000)
+
+
+# ------------------------------------------------------------------ 서버
+OS_TYPES = ("Windows", "Linux")
+ENVIRONMENTS = ("prod", "stg", "dev", "test")
+SERVER_STATUSES = ("운영중", "점검", "폐기예정", "폐기")
+SERVER_TYPES = ("물리", "VM", "클라우드 인스턴스")
+LINUX_DISTROS = ("Ubuntu", "Debian", "RHEL", "Rocky", "AlmaLinux", "CentOS", "Amazon Linux", "SUSE")
+WINDOWS_DISTROS = ("Windows Server 2016", "Windows Server 2019", "Windows Server 2022", "Windows Server 2025")
+_HOSTNAME = re.compile(r"[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?")
+
+
+def _multiline(value: str) -> str:
+    return value.replace("\r\n", "\n").replace("\r", "\n")
+
+
+class ServerForm(FormModel):
+    name: str = Field(min_length=1, max_length=100)
+    hostname: str = Field(min_length=1, max_length=253)
+    os_type: Literal[*OS_TYPES]
+    os_distro: str = Field(default="", max_length=100)       # 목록 추천 + 직접 입력
+    os_version: str = Field(default="", max_length=100)
+    kernel_version: str = Field(default="", max_length=100)  # Windows는 빌드 번호
+    environment: Literal[*ENVIRONMENTS]
+    status: Literal[*SERVER_STATUSES]
+    server_type: Literal[*SERVER_TYPES]
+    location: str = Field(default="", max_length=200)
+    cpu_model: str = Field(default="", max_length=100)
+    cpu_cores: opt_int(1, 4096) = None
+    memory_gb: opt_int(1, 100000) = None
+    description: Annotated[str, AfterValidator(_multiline)] = Field(default="", max_length=4000)
+    notes: Annotated[str, AfterValidator(_multiline)] = Field(default="", max_length=4000)
+    owner_id: OptInt = None
+    tags: Tags = []
+
+    @field_validator("hostname")
+    @classmethod
+    def _hostname_format(cls, v: str) -> str:
+        if not _HOSTNAME.fullmatch(v):
+            raise ValueError("호스트명은 영문, 숫자, '.', '-', '_'만 사용할 수 있습니다.")
+        return v
+
+    @model_validator(mode="after")
+    def _distro_matches_os(self):
+        other = LINUX_DISTROS if self.os_type == "Windows" else WINDOWS_DISTROS
+        if self.os_distro in other:
+            raise ValueError("OS 종류와 배포판이 일치하지 않습니다.")
+        return self
+
+
+class ServerFilter(FormModel):
+    q: str = Field(default="", max_length=100)
+    os_type: opt_choice(*OS_TYPES) = ""
+    os_distro: str = Field(default="", max_length=100)
+    environment: opt_choice(*ENVIRONMENTS) = ""
+    status: opt_choice(*SERVER_STATUSES) = ""
+    gpu_only: Flag = False
+    tag: str = Field(default="", max_length=30)
+    owner_id: OptInt = None
+    mine: Flag = False
+    stale: Flag = False
+    sort: Literal["name", "updated", "verified"] = "name"
+    page: int = Field(default=1, ge=1, le=100000)
+
+
+class NoteForm(FormModel):
+    note_date: OptDate = None
+    content: str = Field(min_length=1, max_length=2000)

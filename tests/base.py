@@ -138,5 +138,14 @@ class WebTestCase(DBTestCase):
         self.client.cookies.set(config.SESSION_COOKIE, raw, domain="testserver.local")
         return security.lookup_session(self.conn, raw).csrf_token
 
+    def login(self, uid):
+        """로그인 세션을 만들고 이후 post_form에 쓸 CSRF 토큰을 저장한다."""
+        self.csrf = self.login_as(uid)
+
+    def post_form(self, path, **data):
+        from urllib.parse import urlencode
+        data.setdefault("csrf_token", getattr(self, "csrf", ""))
+        return self.post(path, urlencode(data))
+
     def post(self, path, data, **kw):
         return self.client.post(path, data=data, headers={"content-type": "application/x-www-form-urlencoded"}, **kw)

@@ -95,6 +95,12 @@ def run_migrations(conn: sqlite3.Connection) -> list[int]:
     return done
 
 
+def like_pattern(text: str) -> str:
+    """부분 일치용 LIKE 패턴. 와일드카드 문자(% _ \\)를 이스케이프한다. 쿼리는 `LIKE ? ESCAPE '\\'`로 쓴다."""
+    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
 def paginate(page: int, total: int, per_page: int) -> tuple[int, int, int]:
     """(보정된 page, 전체 pages, offset)."""
     pages = max(1, -(-total // per_page))

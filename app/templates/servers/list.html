@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}서버{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>서버</h1>
+  <div class="actions">
+    {% if user.role in ("editor", "admin") %}<a class="button" href="/servers/new">서버 등록</a>{% endif %}
+  </div>
+</div>
+{% if errors %}<div class="flash flash-error" role="alert">조회 조건이 올바르지 않습니다. 표시된 항목을 확인하세요.</div>{% endif %}
+<form class="filters" method="get" action="/servers">
+  {{ m.text_field("q", "검색 (서버명·호스트명·IP)", values, errors, maxlength=100) }}
+  {{ m.select_field("os_type", "OS 종류", os_options, values, errors, blank="전체") }}
+  {{ m.select_field("os_distro", "배포판", distro_options, values, errors, blank="전체") }}
+  {{ m.select_field("environment", "환경", env_options, values, errors, blank="전체") }}
+  {{ m.select_field("status", "상태", status_options, values, errors, blank="전체") }}
+  {{ m.select_field("tag", "태그", tag_options, values, errors, blank="전체") }}
+  {{ m.select_field("owner_id", "담당자", owner_filter_options, values, errors, blank="전체") }}
+  {{ m.select_field("sort", "정렬", sort_options, values, errors) }}
+  {{ m.checkbox_field("gpu_only", "GPU 서버만", values.get("gpu_only")) }}
+  {{ m.checkbox_field("mine", "내 담당만", values.get("mine")) }}
+  {{ m.checkbox_field("stale", "확인 필요만", values.get("stale")) }}
+  <button type="submit">조회</button>
+  <a class="button secondary" href="/servers">초기화</a>
+</form>
+<p class="muted">총 {{ total }}건</p>
+<table>
+  <thead><tr><th>서버명</th><th>호스트명</th><th>대표 IP</th><th>OS / 배포판</th><th>환경</th><th>상태</th><th>최대 디스크 사용률</th><th>GPU</th><th>담당자</th><th>확인</th><th>수정일</th></tr></thead>
+  <tbody>
+  {% for s in rows %}
+    <tr>
+      <td><a href="/servers/{{ s.id }}">{{ s.name }}</a><div>{{ m.tag_list(tags[s.id]) }}</div></td>
+      <td>{{ s.hostname }}</td>
+      <td>{{ s.primary_ip or "" }}</td>
+      <td>{{ s.os_type }}{% if s.os_distro %} / {{ s.os_distro }}{% endif %}</td>
+      <td>{{ m.badge(s.environment, "gray") }}</td>
+      <td>{{ m.badge(s.status, {"운영중": "green", "점검": "orange", "폐기예정": "orange", "폐기": "gray"}[s.status]) }}</td>
+      <td>{{ m.usage_bar(s.max_disk_pct) }}</td>
+      <td>{{ s.gpu_summary or "" }}</td>
+      <td>{{ m.owner_cell(s.owner_name, s.owner_active) }}</td>
+      <td>{{ m.verify_badge(s.last_verified_at) }}</td>
+      <td class="nowrap">{{ s.updated_at | kst_date }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="11" class="muted">조건에 맞는 서버가 없습니다.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{{ m.pagination(page, pages, "/servers", query) }}
+{% endblock %}

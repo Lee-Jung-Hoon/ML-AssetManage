@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}{{ "서버 수정" if target else "서버 등록" }}{% endblock %}
+{% block content %}
+<h1>{{ "서버 수정" if target else "서버 등록" }}</h1>
+{% if errors %}<div class="flash flash-error" role="alert">입력값을 확인하세요.</div>{% endif %}
+<form class="form-wide" method="post" action="{{ '/servers/%d/edit' % target.id if target else '/servers/new' }}">
+  {{ m.csrf_input(csrf_token) }}
+  {{ m.field_error(errors, "__all__") }}
+  <div class="form-grid">
+    {{ m.text_field("name", "서버명", values, errors, required=True, maxlength=100) }}
+    {{ m.text_field("hostname", "호스트명", values, errors, required=True, maxlength=253) }}
+    {{ m.select_field("os_type", "OS 종류", os_options, values, errors, required=True) }}
+    <div class="field{% if errors.get('os_distro') %} has-error{% endif %}">
+      <label for="f-os_distro">OS 배포판 (목록에서 고르거나 직접 입력)</label>
+      <input id="f-os_distro" name="os_distro" list="distro-list" maxlength="100" value="{{ values.get('os_distro', '') }}">
+      <datalist id="distro-list">{% for d in distros %}<option value="{{ d }}">{% endfor %}</datalist>
+      {{ m.field_error(errors, "os_distro") }}
+    </div>
+    {{ m.text_field("os_version", "OS 버전", values, errors, maxlength=100) }}
+    {{ m.text_field("kernel_version", "커널 버전 (Windows는 빌드 번호)", values, errors, maxlength=100) }}
+    {{ m.select_field("environment", "환경", env_options, values, errors, required=True) }}
+    {{ m.select_field("status", "상태", status_options, values, errors, required=True) }}
+    {{ m.select_field("server_type", "서버 유형", type_options, values, errors, required=True) }}
+    {{ m.text_field("location", "위치 (IDC·랙 또는 클라우드 리전)", values, errors, maxlength=200) }}
+    {{ m.text_field("cpu_model", "CPU 모델", values, errors, maxlength=100) }}
+    {{ m.text_field("cpu_cores", "코어 수", values, errors, type="number") }}
+    {{ m.text_field("memory_gb", "메모리 (GB)", values, errors, type="number") }}
+    {{ m.owner_select("owner_id", "담당자", owner_opts, values, errors) }}
+    <div class="span2">{{ m.tags_field(values, errors) }}</div>
+    <div class="span2">{{ m.textarea_field("description", "용도 설명", values, errors, maxlength=4000) }}</div>
+    <div class="span2">{{ m.textarea_field("notes", "비고", values, errors, maxlength=4000) }}</div>
+  </div>
+  <p class="muted">GPU는 서버 등록 후 상세 화면의 GPU 섹션에서 추가합니다. 수정은 '내용 확인 완료'로 간주되지 않습니다.</p>
+  <div class="actions">
+    <button type="submit">저장</button>
+    <a class="button secondary" href="{{ '/servers/%d' % target.id if target else '/servers' }}">취소</a>
+  </div>
+</form>
+{% endblock %}

@@ -5,7 +5,7 @@ import jinja2
 from fastapi import Request
 from starlette.templating import Jinja2Templates
 
-from . import config, security
+from . import assets, config, security
 from .db import parse_iso
 
 _env = jinja2.Environment(
@@ -22,7 +22,27 @@ def kst(value: str | None, seconds: bool = False) -> str:
     return local.strftime("%Y-%m-%d %H:%M:%S" if seconds else "%Y-%m-%d %H:%M")
 
 
+def kst_date(value: str | None) -> str:
+    return kst(value)[:10]
+
+
+def usage_class(percent: float | None) -> str:
+    """막대 너비를 10% 단위 클래스(w-0 ~ w-100)로 변환한다 (CSP로 style 속성 금지)."""
+    if percent is None:
+        return "w-0"
+    return f"w-{min(100, max(0, int(percent / 10 + 0.5) * 10))}"
+
+
+def usage_level(percent: float | None) -> str:
+    """80% 이상 주의(주황), 90% 이상 위험(빨강)."""
+    if percent is None:
+        return "gray"
+    return "red" if percent >= 90 else "orange" if percent >= 80 else "green"
+
+
 _env.filters["kst"] = kst
+_env.filters["kst_date"] = kst_date
+_env.globals.update(verify_state=assets.verify_state, usage_class=usage_class, usage_level=usage_level)
 templates = Jinja2Templates(env=_env)
 
 

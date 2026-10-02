@@ -53,3 +53,100 @@
 </nav>
 {% endif %}
 {%- endmacro %}
+
+
+{% macro textarea_field(name, label, values, errors, rows=4, maxlength=None, required=False) -%}
+<div class="field{% if errors and errors.get(name) %} has-error{% endif %}">
+  <label for="f-{{ name }}">{{ label }}{% if required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+  <textarea id="f-{{ name }}" name="{{ name }}" rows="{{ rows }}"{% if maxlength %} maxlength="{{ maxlength }}"{% endif %}{% if required %} required{% endif %}>{{ values.get(name, '') if values else '' }}</textarea>
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}
+
+{# 담당자 선택: options는 assets.owner_options() 결과 (활성 사용자만) #}
+{% macro owner_select(name, label, options, values, errors) -%}
+{{ select_field(name, label, options, values, errors, blank="담당자 없음") }}
+{%- endmacro %}
+
+{% macro tags_field(values, errors) -%}
+{{ text_field("tags", "태그 (쉼표로 구분)", values, errors, maxlength=400) }}
+{%- endmacro %}
+
+{% macro tag_list(tags) -%}
+{% for t in tags %}<span class="tag">{{ t }}</span>{% endfor %}
+{%- endmacro %}
+
+{# 최신성 배지: state는 verify_state(last_verified_at) #}
+{% macro verify_badge(last_verified_at) -%}
+{% set v = verify_state(last_verified_at) -%}
+{% if v.stale %}{{ badge("확인 필요", "orange") }}{% else %}{{ badge("확인됨 " ~ v.date, "green") }}{% endif %}
+{%- endmacro %}
+
+{% macro owner_cell(name, active) -%}
+{% if name %}{{ name }}{% if not active %} {{ badge("비활성 담당자", "orange") }}{% endif %}{% else %}<span class="muted">없음</span>{% endif %}
+{%- endmacro %}
+
+{% macro usage_bar(percent) -%}
+{% if percent is none %}<span class="muted">-</span>{% else %}
+<span class="bar" aria-hidden="true"><span class="bar-fill bar-{{ usage_level(percent) }} {{ usage_class(percent) }}"></span></span>
+{{ badge("%.0f%%" | format(percent), usage_level(percent)) }}
+{% endif %}
+{%- endmacro %}
+
+{# "내용 확인 완료" 버튼 (editor 이상) #}
+{% macro verify_form(action, token) -%}
+<form method="post" action="{{ action }}">
+  {{ csrf_input(token) }}
+  <button type="submit" class="secondary">내용 확인 완료</button>
+</form>
+{%- endmacro %}
+
+{# 운영 메모 타임라인. base: 자산 상세 URL (예: /servers/3) #}
+{% macro notes_section(notes, base, can_write, user, token, today) -%}
+<section class="section" id="notes">
+  <h2>운영 메모</h2>
+  {% if can_write %}
+  <form method="post" action="{{ base }}/notes" class="form-wide">
+    {{ csrf_input(token) }}
+    <div class="form-grid">
+      <div class="field"><label for="note_date">작업 날짜</label>
+        <input id="note_date" type="date" name="note_date" value="{{ today }}"></div>
+      <div class="field span2"><label for="note_content">내용 (최대 2000자)</label>
+        <textarea id="note_content" name="content" rows="3" maxlength="2000" required></textarea></div>
+    </div>
+    <button type="submit">메모 추가</button>
+  </form>
+  {% endif %}
+  {% for n in notes %}
+  <div class="note">
+    <div class="note-meta">
+      <strong>{{ n.note_date }}</strong><span>{{ n.author_name }}</span><span>{{ n.created_at | kst }}</span>
+      {% if can_write and (n.author_id == user.id or user.role == "admin") %}
+      <form method="post" action="{{ base }}/notes/{{ n.id }}/delete">
+        {{ csrf_input(token) }}<button type="submit" class="secondary">삭제</button>
+      </form>
+      {% endif %}
+    </div>
+    <div class="pre">{{ n.content }}</div>
+  </div>
+  {% else %}
+  <p class="muted">작성된 메모가 없습니다.</p>
+  {% endfor %}
+</section>
+{%- endmacro %}
+
+{% macro history_section(history) -%}
+<section class="section" id="history">
+  <h2>변경 이력</h2>
+  <table>
+    <thead><tr><th>시각</th><th>사용자</th><th>행위</th><th>변경 요약</th></tr></thead>
+    <tbody>
+    {% for h in history %}
+      <tr><td class="nowrap">{{ h.at | kst(True) }}</td><td>{{ h.username }}</td><td>{{ h.action }}</td><td class="pre">{{ h.summary }}</td></tr>
+    {% else %}
+      <tr><td colspan="4" class="muted">기록이 없습니다.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{%- endmacro %}

@@ -80,3 +80,23 @@
 - `/backup`, `/servers` 등 사이드바 링크는 이후 단계에서 구현된다 (현재 404).
 - `httpx2` deprecation 경고 (1단계 기록).
 - 자산별 "변경 이력"용 조회 헬퍼는 5단계에서 `audit.py`에 추가한다.
+
+## 5단계: 서버 CRUD + 자산 공통 기능 — 완료
+- 만든 것: `app/assets.py`(태그·운영 메모·최신성·담당자·변경 이력 공통 함수), `routers/asset_common.py`(확인 완료/메모 추가·삭제 라우트 팩토리 `make_common_router`), `routers/servers.py`, `templates/servers/*`, `macros.html` 공통 매크로(textarea/owner/tags/verify 배지/usage bar/메모 타임라인/변경 이력), 스키마(`ServerForm`, `ServerFilter`, `NoteForm`, `Tags`, `opt_int`, `opt_choice`, `Flag`), `db.like_pattern`, `.w-0 ~ .w-100` 막대 CSS, `tests/test_servers.py`
+- 테스트: 195개 통과. grep 점검 0건.
+
+### 주요 결정
+- **재사용 구조**: 서비스/AI 모델/라이선스는 `make_common_router(asset_type, base)`로 확인·메모 라우트를 얻고, 상세 템플릿에서 `notes_section`/`history_section`/`verify_badge`/`owner_cell`/`tag_list` 매크로와 `assets.common_sections()`를 재사용한다. 테이블 이름이 필요한 문장(존재 확인, 확인 완료 UPDATE)은 f-string 대신 asset_type별 상수 SQL 사전.
+- **태그**: 쉼표 구분 → 공백 제거·소문자화·중복 제거, 30자·자산당 10개, 한글/영문/숫자/`-`/`_`만. 목록의 태그 일괄 조회는 ID 목록을 JSON 하나로 바인딩(`json_each`)해 SQL 조립을 피했다.
+- **최신성**: 미확인이거나 마지막 확인이 90일 **초과**(정확히 90일은 통과)면 "확인 필요". 수정은 `last_verified_*`를 건드리지 않고, 변경 없는 저장은 DB·감사 로그에 아무것도 쓰지 않는다 (`updated_at`도 유지).
+- **담당자**: 선택지는 활성 사용자만. 이미 지정된 비활성 담당자는 `[비활성]` 표시로 유지 가능(그대로 저장 허용), 새로 비활성 사용자를 지정하는 것은 거부. 목록/상세에 "비활성 담당자" 배지.
+- **메모**: 작성 editor+, 삭제 작성자 또는 admin(버튼도 권한 없는 사용자에게 숨김), 수정 기능 없음. 검증 실패는 flash 후 303 (상세 화면 재렌더링 불필요).
+- **삭제**: GET 확인 페이지(구동 중인 서비스 경고) → POST 삭제. 같은 트랜잭션에서 태그 연결·메모를 명시 삭제, 하위 항목은 FK CASCADE, 감사 로그는 보존.
+- **배포판**: 서버 폼은 `<datalist>` 추천 + 직접 입력(JS 없이 동작). OS 종류와 반대 OS의 알려진 배포판 조합은 거부.
+- **선택 정수 검증**: `Field(ge=)`는 None에 적용 시 TypeError → `opt_int(min,max)`로 대체 (테스트로 발견).
+- **목록**: 정렬은 `_ORDER` 화이트리스트(서버명/수정일/마지막 확인일 오래된 순), 잘못된 필터·정렬값은 오류 배너+빈 결과. 대표 IP/최대 디스크 사용률/GPU 요약은 하위 테이블 서브쿼리(6단계 입력 전에는 빈 값).
+- `server_conditions()`를 함수로 분리해 11단계 CSV 내보내기가 같은 필터를 재사용한다.
+
+### 남은 이슈
+- 서버 상세의 하위 섹션(IP/디스크/GPU/호스트 서비스/컨테이너/ACL)은 6단계, 구동 서비스는 7단계, 연결 라이선스는 8~9단계에서 추가.
+- `httpx2` deprecation 경고 (1단계 기록).
