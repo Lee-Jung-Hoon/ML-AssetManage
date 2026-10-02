@@ -5,12 +5,24 @@ import jinja2
 from fastapi import Request
 from starlette.templating import Jinja2Templates
 
-from . import security
+from . import config, security
+from .db import parse_iso
 
 _env = jinja2.Environment(
     loader=jinja2.FileSystemLoader(Path(__file__).parent / "templates"),
     autoescape=True,
 )
+
+
+def kst(value: str | None, seconds: bool = False) -> str:
+    """UTC ISO 문자열을 Asia/Seoul 표시 문자열로 변환한다 (저장은 UTC, 표시만 KST)."""
+    if not value:
+        return ""
+    local = parse_iso(value).astimezone(config.DISPLAY_TZ)
+    return local.strftime("%Y-%m-%d %H:%M:%S" if seconds else "%Y-%m-%d %H:%M")
+
+
+_env.filters["kst"] = kst
 templates = Jinja2Templates(env=_env)
 
 

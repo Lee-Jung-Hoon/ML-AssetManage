@@ -60,3 +60,23 @@
 ### 남은 이슈
 - `httpx2` deprecation 경고 (1단계 기록).
 - 비밀번호 변경 화면의 서버측 잠금 문구는 로그인 잠금과 같은 계정 카운터를 공유한다 (의도된 동작이지만 사용자 혼동 가능).
+
+## 4단계: 사용자 관리, 비밀번호 초기화, 감사 로그 조회 — 완료
+- 만든 것: `app/routers/users.py`, `app/routers/audit.py`, `templates/users/{list,form,credentials}.html`, `templates/audit/list.html`, `macros.html`(select/checkbox/pagination), `schemas.py`(UserCreateForm/UserEditForm/AuditFilter/Checkbox/OptDate), `db.py`(`paginate`, `select_where`), `templating.py`(`kst` 필터), `tests/test_users.py`
+- 테스트: `.venv/bin/python -m unittest` 148개 통과 (반복 실행해도 동일). grep 점검(SQL 조립·템플릿 우회·인라인 script/style) 0건.
+
+### 주요 결정
+- **임시 비밀번호는 POST 응답 화면에 한 번만 표시** (PRG 예외). DB·flash·감사 로그·목록 어디에도 평문을 남기지 않는다. 새로고침(재전송)하면 중복 사용자명 오류가 나므로 재노출되지 않는다.
+- **본인 계정 보호**: admin은 본인을 비활성화/강등할 수 없고 `비밀번호 초기화`도 본인에게는 불가(비밀번호 변경 화면 사용). 이 규칙으로 "마지막 활성 admin 보호"가 충족된다 — 변경을 수행하는 주체는 항상 활성 admin이므로, 본인 변경을 막으면 admin이 0명이 될 수 없다. (두 admin이 동시에 서로를 강등하는 극단적 경합만 남으며, 그 경우 `reset-admin`으로 복구한다.)
+- **세션 무효화 규칙**: 역할 변경 또는 활성→비활성 시, 비밀번호 초기화 시 해당 사용자의 모든 세션 삭제. 이름/팀만 바꾸면 세션 유지.
+- **변경 없음**은 감사 로그를 남기지 않고 "변경된 내용이 없습니다." flash.
+- **사용자명 규칙**: 영문/숫자로 시작, `[A-Za-z0-9._-]` 2~50자, 대소문자 무시 중복 불가. 수정 화면에서 사용자명은 변경 불가. 삭제 라우트는 없다 (비활성화만).
+- **감사 로그 필터**: 날짜는 KST 기준 (시작일 0시 ~ 종료일 당일 포함). 사용자 필터는 users 테이블의 사용자명 목록(로그인 실패 시 입력된 임의 문자열이 드롭다운을 키우지 못하게). 잘못된 필터(날짜 형식·알 수 없는 파라미터·길이 초과)는 데이터를 보여주지 않고 오류 배너만 표시. 페이지당 50건, 범위 초과 페이지는 마지막 쪽으로 보정. 동적 WHERE는 코드에 고정된 `?` 조각만 `select_where`로 결합.
+- 감사 로그 화면은 읽기 전용 (GET 외 405, 수정/삭제 라우트 없음).
+- 사이드바 admin 메뉴는 `ADMIN_ENABLED=true`이고 admin일 때만 표시 (3단계 구현 그대로).
+- 테스트 헬퍼 수정: 같은 초에 만든 세션 두 개의 CSRF 토큰을 `created_at` 정렬로 구분하던 불안정성을 `lookup_session`으로 교체.
+
+### 남은 이슈
+- `/backup`, `/servers` 등 사이드바 링크는 이후 단계에서 구현된다 (현재 404).
+- `httpx2` deprecation 경고 (1단계 기록).
+- 자산별 "변경 이력"용 조회 헬퍼는 5단계에서 `audit.py`에 추가한다.

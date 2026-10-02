@@ -11,7 +11,8 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import config, db, security
-from .routers import auth, dashboard
+from .routers import audit as audit_router
+from .routers import auth, dashboard, users
 from .security import LoginRequired, PasswordChangeRequired, safe_redirect_path
 from .templating import render
 
@@ -106,6 +107,8 @@ def create_app() -> FastAPI:
     app.include_router(auth.public_router)
     app.include_router(auth.router)
     app.include_router(dashboard.router)
+    app.include_router(users.router)
+    app.include_router(audit_router.router)
     app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
     @app.get("/healthz", response_class=PlainTextResponse)

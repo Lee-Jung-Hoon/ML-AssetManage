@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}{{ "사용자 수정" if target else "사용자 추가" }}{% endblock %}
+{% block content %}
+<h1>{{ "사용자 수정" if target else "사용자 추가" }}</h1>
+<form class="form-narrow" method="post" action="{{ '/users/%d/edit' % target.id if target else '/users/new' }}">
+  {{ m.csrf_input(csrf_token) }}
+  {% if target %}
+  <div class="field"><label>사용자명</label><div>{{ target.username }}</div></div>
+  {% else %}
+  {{ m.text_field("username", "사용자명 (로그인 ID)", values, errors, required=True, maxlength=50, autocomplete="off") }}
+  {% endif %}
+  {{ m.text_field("display_name", "표시 이름", values, errors, required=True, maxlength=100) }}
+  {{ m.text_field("team", "소속 팀", values, errors, maxlength=100) }}
+  {{ m.select_field("role", "역할", [("admin", "admin (관리자)"), ("editor", "editor (편집)"), ("viewer", "viewer (읽기 전용)")], values, errors, required=True) }}
+  {% if target %}
+  {{ m.checkbox_field("is_active", "활성 계정", values.get("is_active")) }}
+  {{ m.field_error(errors, "is_active") }}
+  <p class="muted">비활성화하거나 역할을 바꾸면 해당 사용자의 모든 로그인 세션이 종료됩니다.</p>
+  {% else %}
+  <p class="muted">임시 비밀번호가 자동 생성되어 저장 직후 화면에 한 번만 표시됩니다. 첫 로그인 시 변경이 강제됩니다.</p>
+  {% endif %}
+  {{ m.field_error(errors, "__all__") }}
+  <div class="actions">
+    <button type="submit">저장</button>
+    <a class="button secondary" href="/users">취소</a>
+  </div>
+</form>
+{% if target %}
+<hr>
+<h2>비밀번호 초기화</h2>
+<form method="post" action="/users/{{ target.id }}/reset-password">
+  {{ m.csrf_input(csrf_token) }}
+  <p>새 임시 비밀번호를 생성하고 기존 세션을 모두 종료합니다. 다음 로그인 시 변경이 강제됩니다.</p>
+  <button type="submit" class="danger">비밀번호 초기화</button>
+</form>
+{% endif %}
+{% endblock %}

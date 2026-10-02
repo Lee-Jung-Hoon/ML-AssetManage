@@ -23,3 +23,33 @@
 {% macro badge(text, kind="gray") -%}
 <span class="badge badge-{{ kind }}">{{ text }}</span>
 {%- endmacro %}
+
+{% macro select_field(name, label, options, values, errors, required=False, blank=None) -%}
+<div class="field{% if errors and errors.get(name) %} has-error{% endif %}">
+  <label for="f-{{ name }}">{{ label }}{% if required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+  <select id="f-{{ name }}" name="{{ name }}"{% if required %} required{% endif %}>
+    {% if blank is not none %}<option value="">{{ blank }}</option>{% endif %}
+    {% for value, text in options %}
+    <option value="{{ value }}"{% if values and values.get(name) == value %} selected{% endif %}>{{ text }}</option>
+    {% endfor %}
+  </select>
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}
+
+{% macro checkbox_field(name, label, checked) -%}
+<div class="field field-check">
+  <label><input type="checkbox" name="{{ name }}" value="on"{% if checked %} checked{% endif %}> {{ label }}</label>
+</div>
+{%- endmacro %}
+
+{# 페이지네이션: query는 page를 제외한 현재 필터 dict #}
+{% macro pagination(page, pages, path, query) -%}
+{% if pages > 1 %}
+<nav class="pagination" aria-label="페이지 이동">
+  {% if page > 1 %}<a href="{{ path }}?{{ (query | urlencode) }}{{ '&' if query }}page={{ page - 1 }}">이전</a>{% endif %}
+  <span>{{ page }} / {{ pages }}</span>
+  {% if page < pages %}<a href="{{ path }}?{{ (query | urlencode) }}{{ '&' if query }}page={{ page + 1 }}">다음</a>{% endif %}
+</nav>
+{% endif %}
+{%- endmacro %}

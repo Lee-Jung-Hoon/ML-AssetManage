@@ -1,7 +1,9 @@
 """Pydantic 입력 모델 공통 기반. 모든 폼 모델은 FormModel을 상속한다 (extra="forbid")."""
-from typing import Annotated, Any
+import re
+from datetime import date
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError, field_validator
 
 
 class FormModel(BaseModel):
@@ -15,6 +17,9 @@ def _blank_to_none(value: Any) -> Any:
 # HTML 폼은 빈 입력을 ''로 보내므로 선택 항목은 None으로 바꿔 검증한다.
 OptInt = Annotated[int | None, BeforeValidator(_blank_to_none)]
 OptFloat = Annotated[float | None, BeforeValidator(_blank_to_none)]
+OptDate = Annotated[date | None, BeforeValidator(_blank_to_none)]
+# 체크박스는 체크된 경우에만 전송된다 (미전송 = False).
+Checkbox = Annotated[bool, BeforeValidator(lambda v: v in ("on", "1", "true", True))]
 
 _MESSAGES = {
     "missing": "필수 항목입니다.",
@@ -72,3 +77,37 @@ class PasswordChangeForm(SecretFormModel):
     current_password: str = Field(min_length=1, max_length=256)
     new_password: str = Field(min_length=1, max_length=256)
     new_password2: str = Field(min_length=1, max_length=256)
+
+
+Role = Literal["admin", "editor", "viewer"]
+_USERNAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{1,49}")
+
+
+class UserCreateForm(FormModel):
+    username: str = Field(max_length=50)
+    display_name: str = Field(min_length=1, max_length=100)
+    team: str = Field(default="", max_length=100)
+    role: Role
+
+    @field_validator("username")
+    @classmethod
+    def _username_format(cls, v: str) -> str:
+        if not _USERNAME.fullmatch(v):
+            raise ValueError("영문, 숫자, '.', '_', '-'만 사용해 2~50자로 입력하세요 (첫 글자는 영문/숫자).")
+        return v
+
+
+class UserEditForm(FormModel):
+    display_name: str = Field(min_length=1, max_length=100)
+    team: str = Field(default="", max_length=100)
+    role: Role
+    is_active: Checkbox = False
+
+
+class AuditFilter(FormModel):
+    date_from: OptDate = None
+    date_to: OptDate = None
+    user: str = Field(default="", max_length=64)
+    action: str = Field(default="", max_length=50)
+    target_type: str = Field(default="", max_length=30)
+    page: int = Field(default=1, ge=1, le=100000)

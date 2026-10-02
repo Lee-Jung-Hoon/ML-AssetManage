@@ -93,3 +93,21 @@ def run_migrations(conn: sqlite3.Connection) -> list[int]:
             raise
         done.append(version)
     return done
+
+
+def paginate(page: int, total: int, per_page: int) -> tuple[int, int, int]:
+    """(보정된 page, 전체 pages, offset)."""
+    pages = max(1, -(-total // per_page))
+    page = min(max(page, 1), pages)
+    return page, pages, (page - 1) * per_page
+
+
+def select_where(conn: sqlite3.Connection, base_sql: str, conditions: list[tuple[str, tuple]],
+                 tail: str = "", tail_params: tuple = ()) -> sqlite3.Cursor:
+    """동적 필터 쿼리를 조립하는 유일한 지점. base_sql/tail/조건 조각은 모두 코드에 고정된 상수여야 하며
+    (`?` 바인딩만 포함), 사용자 입력은 conditions의 값으로만 전달한다."""
+    if conditions:
+        base_sql += " WHERE " + " AND ".join(fragment for fragment, _ in conditions)
+    values = [v for _, vals in conditions for v in vals]
+    sql = f"{base_sql} {tail}"
+    return conn.execute(sql, [*values, *tail_params])

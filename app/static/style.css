@@ -37,3 +37,18 @@ th { background: #eef2f6; font-weight: 600; }
 .badge-gray { background: #eef0f2; color: #4a5560; border-color: #c5ccd3; }
 .error-page { text-align: center; padding: 40px 0; }
 .error-page h1 { font-size: 48px; margin: 0; color: #4a5560; }
+.page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.page-head h1 { margin: 0; }
+.actions { display: flex; gap: 8px; align-items: center; }
+.actions form { margin: 0; }
+a.button { display: inline-block; padding: 6px 12px; border-radius: 4px; background: #1f5fbf; color: #fff; text-decoration: none; }
+a.button.secondary { background: #fff; color: #1f2933; border: 1px solid #b8c2cc; }
+.filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 14px; }
+.filters .field { margin: 0; }
+.field-check label { display: flex; gap: 6px; align-items: center; }
+.pagination { display: flex; gap: 12px; align-items: center; justify-content: center; margin: 14px 0; }
+.form-narrow { max-width: 480px; }
+.secret-box { padding: 12px 16px; background: #fff4e0; border: 1px solid #f0c987; border-radius: 4px; margin: 14px 0; }
+.secret-box code { font-size: 18px; font-weight: 700; user-select: all; }
+.muted { color: #6b7782; }
+.nowrap { white-space: nowrap; }

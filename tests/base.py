@@ -136,8 +136,7 @@ class WebTestCase(DBTestCase):
         """세션을 직접 만들어 쿠키를 심는다. CSRF 토큰을 반환한다."""
         raw = security.create_session(self.conn, uid)
         self.client.cookies.set(config.SESSION_COOKIE, raw, domain="testserver.local")
-        return self.conn.execute("SELECT csrf_token FROM sessions WHERE user_id=? ORDER BY created_at DESC",
-                                 (uid,)).fetchone()[0]
+        return security.lookup_session(self.conn, raw).csrf_token
 
     def post(self, path, data, **kw):
         return self.client.post(path, data=data, headers={"content-type": "application/x-www-form-urlencoded"}, **kw)
