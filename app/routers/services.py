@@ -12,6 +12,7 @@ from ..schemas import (DEPLOY_METHODS, ENVIRONMENTS, LINK_PROTOCOLS, SERVICE_CAT
                        ServiceServerCreateForm, ServiceServerEditForm, validate_form)
 from ..security import CurrentUser, require_login, require_role
 from ..templating import render
+from . import licenses as license_views
 from .asset_common import make_common_router
 
 router = APIRouter(dependencies=[Depends(require_login)])
@@ -240,6 +241,8 @@ def service_detail(request: Request, service_id: int, user: CurrentUser = Depend
         "s": service, "can_write": _can_write(user), "tier_badge": TIER_BADGE,
         "servers": servers_of(conn, service_id), "outgoing": outgoing_links(conn, service_id),
         "incoming": incoming_links(conn, service_id),
+        "licenses": [x for x in license_views.licenses_of_service(conn, service_id) if x["license_type"] != "AI API"],
+        "ai_apis": [x for x in license_views.licenses_of_service(conn, service_id) if x["license_type"] == "AI API"],
         **assets.common_sections(conn, "service", service_id),
     })
 

@@ -195,3 +195,12 @@
 {% macro tier_badge(tier) -%}
 {{ badge("Tier " ~ tier, {1: "red", 2: "orange", 3: "gray"}[tier]) }}
 {%- endmacro %}
+
+{# 라이선스 만료 상태 배지: info는 assets.license_status() 결과 (만료=빨강, 임박=주황, 유효=초록, 영구=회색) #}
+{% macro license_badge(info) -%}
+{{ badge(info.state ~ ((" D-" ~ info.days) if info.days is not none and info.days >= 0 else (" D+" ~ (-info.days)) if info.days is not none else ""), info.badge) }}
+{%- endmacro %}
+
+{% macro policy_badge(risk) -%}
+{% if risk %}{{ badge("데이터 정책 확인", "red") }}{% endif %}
+{%- endmacro %}

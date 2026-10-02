@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}{{ "서버" if kind == "server" else "서비스" }} 연결{% endblock %}
+{% block content %}
+<h1>{{ "서버" if kind == "server" else "서비스" }} 연결 <small class="muted">{{ l.name }}</small></h1>
+{% if errors %}<div class="flash flash-error" role="alert">입력값을 확인하세요.</div>{% endif %}
+<form class="form-narrow" method="post" action="/licenses/{{ l.id }}/{{ kind }}s/new">
+  {{ m.csrf_input(csrf_token) }}
+  {{ m.select_field(kind ~ "_id", "서버" if kind == "server" else "서비스", options, {}, errors, required=True, blank="선택하세요") }}
+  <div class="actions">
+    <button type="submit">연결</button>
+    <a class="button secondary" href="/licenses/{{ l.id }}#{{ kind }}s">취소</a>
+  </div>
+</form>
+{% endblock %}

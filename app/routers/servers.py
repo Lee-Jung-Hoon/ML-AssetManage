@@ -11,6 +11,7 @@ from ..schemas import (ENVIRONMENTS, LINUX_DISTROS, OS_TYPES, SERVER_STATUSES, S
                        ServerFilter, ServerForm, validate_form)
 from ..security import CurrentUser, require_login, require_role
 from ..templating import render
+from . import licenses as license_views
 from . import server_items
 from .asset_common import make_common_router
 
@@ -170,6 +171,7 @@ def server_detail(request: Request, server_id: int, user: CurrentUser = Depends(
         "s": server, "can_write": security.ROLE_RANK[user.role] >= security.ROLE_RANK["editor"],
         "sections": server_items.build_sections(conn, server_id),
         "services": _running_services(conn, server_id),
+        "licenses": license_views.licenses_of_server(conn, server_id),
         "gpu_total": server_items.gpu_totals(conn, server_id),
         **assets.common_sections(conn, "server", server_id),
     })

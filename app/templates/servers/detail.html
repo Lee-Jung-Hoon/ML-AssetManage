@@ -75,6 +75,22 @@
   {% else %}<p class="muted">이 서버에서 구동 중인 서비스가 없습니다.</p>{% endif %}
 </section>
 
+<section class="section" id="licenses">
+  <h2>연결된 라이선스 ({{ licenses | length }})</h2>
+  {% if licenses %}
+<table>
+  <thead><tr><th>이름</th><th>종류</th><th>만료일</th><th>상태</th></tr></thead>
+  <tbody>
+  {% for x in licenses %}
+    <tr><td><a href="/licenses/{{ x.id }}">{{ x.name }}</a>{% if x.ai_provider %} <span class="muted">({{ x.ai_provider }})</span>{% endif %}</td>
+        <td>{{ x.license_type }}</td><td class="nowrap">{{ x.expires_at or "만료 없음" }}</td>
+        <td>{{ m.license_badge(x.status) }} {{ m.policy_badge(x.policy_risk) }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+  {% else %}<p class="muted">연결된 라이선스가 없습니다.</p>{% endif %}
+</section>
+
 {{ m.notes_section(notes, "/servers/%d" % s.id, can_write, user, csrf_token, today) }}
 {{ m.history_section(history) }}
 {% endblock %}

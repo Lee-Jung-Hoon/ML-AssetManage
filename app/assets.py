@@ -194,3 +194,25 @@ def common_sections(conn: sqlite3.Connection, asset_type: str, asset_id: int) ->
         "history": history(conn, asset_type, asset_id),
         "today": today_kst(),
     }
+
+
+# ------------------------------------------------------------------ 라이선스 상태 (저장하지 않고 만료일로 계산)
+
+LICENSE_STATE_BADGE = {"만료됨": "red", "만료 임박": "orange", "유효": "green", "영구": "gray"}
+
+
+def license_status(expires_at: str | None, no_expiry: bool, alert_days: int, today: str | None = None) -> dict:
+    """상태: 영구 / 만료됨(만료일 < 오늘) / 만료 임박(오늘 ≤ 만료일 ≤ 오늘+알림 기준일) / 유효.
+
+    날짜 비교는 Asia/Seoul 기준의 'YYYY-MM-DD' 문자열이다. days는 만료까지 남은 일수(음수면 경과)."""
+    if no_expiry or not expires_at:
+        return {"state": "영구", "badge": "gray", "days": None}
+    today = today or today_kst()
+    days = (datetime.strptime(expires_at, "%Y-%m-%d").date() - datetime.strptime(today, "%Y-%m-%d").date()).days
+    state = "만료됨" if days < 0 else "만료 임박" if days <= alert_days else "유효"
+    return {"state": state, "badge": LICENSE_STATE_BADGE[state], "days": days}
+
+
+def data_policy_risk(sends_customer_data: str | None, training_opt_out: str | None) -> bool:
+    """고객 데이터를 전송하는 AI API인데 학습 활용 거부(opt-out)가 미설정/미확인이면 위험."""
+    return sends_customer_data == "예" and training_opt_out in ("미설정", "미확인")

@@ -32,6 +32,14 @@ def opt_int(minimum: int, maximum: int):
     return Annotated[int | None, BeforeValidator(_blank_to_none), AfterValidator(check)]
 
 
+def opt_float(minimum: float, maximum: float):
+    def check(value: float | None) -> float | None:
+        if value is not None and not minimum <= value <= maximum:
+            raise ValueError("허용 범위를 벗어난 값입니다.")
+        return value
+    return Annotated[float | None, BeforeValidator(_blank_to_none), AfterValidator(check)]
+
+
 # 쉼표로 구분한 태그 입력 → 정규화된 목록 (assets.parse_tags가 한국어 오류를 던진다)
 Tags = Annotated[list[str], BeforeValidator(parse_tags)]
 
@@ -521,3 +529,167 @@ class ServiceLinkForm(FormModel):
         if (self.target_service_id is None) == (self.external_name == ""):
             raise ValueError("내부 서비스와 외부 시스템 중 정확히 하나만 지정하세요.")
         return self
+
+
+# ------------------------------------------------------------------ 라이선스 (8단계)
+LICENSE_TYPES = ("SSL/TLS 인증서", "소프트웨어 라이선스", "구독(SaaS)", "AI API", "도메인", "기타")
+BILLING_CYCLES = ("월", "연", "영구")
+KEY_ALGOS = ("RSA 2048", "RSA 4096", "ECDSA P-256", "기타")
+AI_PROVIDERS = ("OpenAI", "Anthropic", "Google", "Azure OpenAI", "AWS Bedrock", "기타")
+AI_SENDS = ("예", "아니오", "미확인")
+AI_OPT_OUT = ("설정됨", "미설정", "해당 없음", "미확인")
+CURRENCIES = ("KRW", "USD", "EUR", "JPY", "CNY")
+SSL_TYPE, AI_TYPE = "SSL/TLS 인증서", "AI API"
+SENSITIVE_FORM_FIELDS = ("license_key", "account_info")
+
+_CN = re.compile(r"[A-Za-z0-9*._:@-]+")
+_SAN = re.compile(r"[A-Za-z0-9*._:-]+")
+_FINGERPRINT = re.compile(r"[0-9A-Fa-f]{64}")
+
+
+def _lines(value: str, label: str, max_lines: int, max_len: int, pattern: re.Pattern | None = None) -> str:
+    items = [line.strip() for line in value.replace("\r\n", "\n").replace("\r", "\n").split("\n") if line.strip()]
+    if len(items) > max_lines:
+        raise ValueError(f"{label}은(는) 최대 {max_lines}줄까지 입력할 수 있습니다.")
+    for item in items:
+        if len(item) > max_len or (pattern and not pattern.fullmatch(item)):
+            raise ValueError(f"{label}의 형식이 올바르지 않습니다 (줄당 {max_len}자 이하).")
+    return "\n".join(items)
+
+
+def _san_lines(value: str) -> str:
+    return _lines(value, "SAN 목록", 100, 253, _SAN)
+
+
+def _model_lines(value: str) -> str:
+    return _lines(value, "사용 모델", 30, 100)
+
+
+def _cn(value: str) -> str:
+    if value and not _CN.fullmatch(value):
+        raise ValueError("CN 형식이 올바르지 않습니다.")
+    return value
+
+
+def _fingerprint(value: str) -> str:
+    if value == "":
+        return value
+    hex_only = value.replace(":", "").replace(" ", "")
+    if not _FINGERPRINT.fullmatch(hex_only):
+        raise ValueError("SHA-256 지문은 64자리 16진수여야 합니다 (콜론 구분 가능).")
+    upper = hex_only.upper()
+    return ":".join(upper[i:i + 2] for i in range(0, 64, 2))
+
+
+def _currency(value: str) -> str:
+    value = value.upper()
+    if not re.fullmatch(r"[A-Z]{3}", value):
+        raise ValueError("통화는 3자리 영문 코드여야 합니다 (예: KRW, USD).")
+    return value
+
+
+class LicenseForm(FormModel):
+    name: str = Field(min_length=1, max_length=200)
+    license_type: Literal[*LICENSE_TYPES]
+    vendor: str = Field(default="", max_length=100)
+    start_date: OptDate = None
+    no_expiry: Checkbox = False
+    expires_at: OptDate = None
+    auto_renew: Checkbox = False
+    quantity: opt_int(0, 10_000_000) = None
+    cost: opt_float(0, 1e12) = None
+    currency: Annotated[str, AfterValidator(_currency)] = "KRW"
+    billing_cycle: opt_choice(*BILLING_CYCLES) = ""
+    alert_days: int = Field(default=30, ge=0, le=365)
+    notes: Annotated[str, AfterValidator(_multiline)] = Field(default="", max_length=4000)
+
+    # 민감 정보 (AES-256-GCM으로 암호화해 저장). 수정 화면에서 비워 두면 기존 값을 유지한다.
+    license_key: str = Field(default="", max_length=2000, validate_default=True)
+    account_info: str = Field(default="", max_length=2000, validate_default=True)
+    clear_license_key: Checkbox = False
+    clear_account_info: Checkbox = False
+
+    # SSL/TLS 인증서 전용
+    ssl_cn: Annotated[str, AfterValidator(_cn)] = Field(default="", max_length=253)
+    ssl_san: Annotated[str, AfterValidator(_san_lines)] = Field(default="", max_length=30000)
+    ssl_wildcard: Checkbox = False
+    ssl_ca: str = Field(default="", max_length=200)
+    ssl_key_algo: opt_choice(*KEY_ALGOS) = ""
+    ssl_serial: str = Field(default="", max_length=100)
+    ssl_sha256: Annotated[str, AfterValidator(_fingerprint)] = Field(default="", max_length=100)
+
+    # AI API 전용 (API 키 자체는 받지 않고 보관 위치만 기록)
+    ai_provider: str = Field(default="", max_length=100, validate_default=True)
+    ai_models: Annotated[str, AfterValidator(_model_lines)] = Field(default="", max_length=4000)
+    ai_monthly_budget: opt_float(0, 1e12) = None
+    ai_usage_limit_set: Checkbox = False
+    ai_key_location: str = Field(default="", max_length=300)
+    ai_sends_customer_data: opt_choice(*AI_SENDS) = ""
+    ai_training_opt_out: opt_choice(*AI_OPT_OUT) = ""
+    ai_retention_note: str = Field(default="", max_length=1000)
+
+    owner_id: OptInt = None
+    tags: Tags = []
+
+    @field_validator("license_key", "account_info")
+    @classmethod
+    def _no_secrets_for_ai_api(cls, v: str, info) -> str:
+        # API 키 자체는 받지 않는다: AI API 종류에서는 값이 들어오면 거부한다.
+        if v and info.data.get("license_type") == AI_TYPE:
+            raise ValueError("AI API 종류에서는 키/계정 정보를 입력할 수 없습니다. 키 보관 위치(예: Vault 경로)만 기록하세요.")
+        return v
+
+    @field_validator("ai_provider")
+    @classmethod
+    def _provider_required_for_ai(cls, v: str, info) -> str:
+        if info.data.get("license_type") == AI_TYPE:
+            if not v:
+                raise ValueError("AI API 종류는 제공사가 필요합니다.")
+            return v
+        return ""
+
+    @model_validator(mode="after")
+    def _cross_checks(self):
+        if self.no_expiry and self.expires_at is not None:
+            raise ValueError("'만료 없음'과 만료일은 함께 지정할 수 없습니다.")
+        if not self.no_expiry and self.expires_at is None:
+            raise ValueError("만료일을 입력하거나 '만료 없음'을 체크하세요.")
+        if self.start_date and self.expires_at and self.expires_at < self.start_date:
+            raise ValueError("만료일은 시작일보다 빠를 수 없습니다.")
+        if self.license_type != SSL_TYPE:        # 종류별 전용 필드는 해당 종류에서만 저장한다
+            self.ssl_cn = self.ssl_san = self.ssl_ca = self.ssl_key_algo = self.ssl_serial = self.ssl_sha256 = ""
+            self.ssl_wildcard = False
+        if self.license_type == AI_TYPE:
+            self.ai_sends_customer_data = self.ai_sends_customer_data or "미확인"
+            self.ai_training_opt_out = self.ai_training_opt_out or "미확인"
+            self.clear_license_key = self.clear_account_info = True
+        else:
+            self.ai_models = self.ai_key_location = self.ai_retention_note = ""
+            self.ai_sends_customer_data = self.ai_training_opt_out = ""
+            self.ai_monthly_budget, self.ai_usage_limit_set = None, False
+        return self
+
+
+class LicenseFilter(FormModel):
+    q: str = Field(default="", max_length=100)
+    license_type: opt_choice(*LICENSE_TYPES) = ""
+    expiry: opt_choice("만료됨", "만료 임박", "유효", "영구") = ""
+    ai_provider: str = Field(default="", max_length=100)
+    tag: str = Field(default="", max_length=30)
+    owner_id: OptInt = None
+    mine: Flag = False
+    stale: Flag = False
+    sort: Literal["expiry", "name", "updated", "verified"] = "expiry"
+    page: int = Field(default=1, ge=1, le=100000)
+
+
+class RevealForm(FormModel):
+    field: Literal["license_key", "account_info"]
+
+
+class LicenseServerForm(FormModel):
+    server_id: int = Field(ge=1)
+
+
+class LicenseServiceForm(FormModel):
+    service_id: int = Field(ge=1)

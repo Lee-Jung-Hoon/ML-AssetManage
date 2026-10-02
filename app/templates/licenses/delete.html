@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}라이선스 삭제{% endblock %}
+{% block content %}
+<h1>라이선스 삭제</h1>
+<p><strong>{{ l.name }}</strong> ({{ l.license_type }})을(를) 삭제합니다. 암호화된 민감 정보, 서버/서비스 연결, 태그, 운영 메모도 함께 삭제되며 되돌릴 수 없습니다. 변경 이력(감사 로그)은 남습니다.</p>
+{% if models %}
+<div class="warn-box" role="alert">
+  <strong>이 라이선스(AI API)를 사용하는 AI 모델이 {{ models | length }}개 있습니다.</strong> 삭제하면 해당 모델의 API 연결이 해제됩니다.
+  <ul>{% for mdl in models %}<li><a href="/models/{{ mdl.id }}">{{ mdl.name }} {{ mdl.version }}</a> · {{ mdl.status }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+<form method="post" action="/licenses/{{ l.id }}/delete" class="actions">
+  {{ m.csrf_input(csrf_token) }}
+  <button type="submit" class="danger">삭제</button>
+  <a class="button secondary" href="/licenses/{{ l.id }}">취소</a>
+</form>
+{% endblock %}
