@@ -42,6 +42,7 @@ def login_submit(request: Request, form: dict[str, str] = Depends(read_form),
     old_raw = request.cookies.get(config.SESSION_COOKIE)
     old = security.lookup_session(conn, old_raw)
     with transaction(conn):
+        security.purge_expired_sessions(conn)
         if old is not None:
             security.delete_session(conn, old.session_hash)
         raw = security.create_session(conn, user["id"])       # 로그인마다 세션 ID 재발급

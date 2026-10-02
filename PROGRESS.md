@@ -248,3 +248,33 @@
 
 ### 남은 이슈
 - Caddy 예시, XFF 신뢰 근거 등 문서는 14단계 README에서 작성.
+
+## 14단계: 테스트 보강, README — 완료
+- 만든 것: `README.md`(실행·첫 로그인·관리자 차단/복구·백업과 키 보관·IP 신뢰 근거와 한계·Caddy 예시·CSV 일괄 등록 형식·보안 체크리스트 표(구현 위치+검증 테스트)·설계 결정 27개·범위 외 항목), `tests/test_policy.py`, 만료 세션 정리(`security.purge_expired_sessions`, 기동 시/로그인 시)
+- 테스트: **517개 통과** (`python -m unittest`).
+- `pip-audit -r requirements.txt --disable-pip`: No known vulnerabilities found.
+- grep 점검: `execute\(f|execute\(.*%|execute\(.*\+` 0건, `\|safe|Markup\(|autoescape false` 0건 (둘 다 `test_packaging`에 회귀 테스트로 포함).
+- 최종 코드로 이미지 재빌드 후 컨테이너 end-to-end 스모크 테스트 재통과 (13단계 기록 참고).
+
+### 8장 필수 테스트 대조에서 보강한 것 (`tests/test_policy.py`)
+- 라우트 전수 introspection: PUT/PATCH/DELETE 없음, GET 핸들러에 쓰기 없음, **모든 라우트에 `require_login`**(로그인 페이지·`/healthz` 예외), **모든 POST에 `csrf_form` + 명시적 `require_role`**(`/logout`, `/password` 예외), 엔드포인트는 모두 동기 `def`, 회원가입/JSON API 경로 없음, 모든 POST를 CSRF 없이 실제로 호출해 403 확인.
+- 모든 대표 화면/에러/POST 오류 응답에 보안 헤더 4종, 인증된 화면 `no-store`, 에러 페이지가 내부 정보를 노출하지 않음.
+- **로깅 테스트**: 로그인/라이선스 키 등록/열람/오류 흐름 동안 모든 로거 출력에 비밀번호·세션 ID·CSRF·라이선스 키·계정 정보·암호화 키가 없음을 확인.
+- 만료 세션 정리, 막대 너비 CSS 클래스 `.w-0~.w-100`, 단일 스타일시트만 사용.
+
+### 최종 상태 요약
+- 14단계 전부 완료. 모든 단계가 `claude/claude-md-planning-schema-d3sabd` 브랜치에 단계별 커밋으로 푸시되어 있다.
+- 런타임 의존성: fastapi, uvicorn(extras 없음), jinja2, cryptography + 해시 고정된 전이 의존성. 설정 환경변수는 `ADMIN_ENABLED` 하나.
+
+### 명세를 해석/보완한 부분 (한눈에 보기 — 자세한 근거는 단계별 기록과 README 설계 결정)
+- 로그인 폼 CSRF 예외(합의), `config.py` 추가, `reset-admin` 복구형, admin 본인 비활성화/강등/초기화 금지.
+- "ACL 전체 목록" 화면 신설(명세가 그 화면의 내보내기를 요구), 내보내기는 POST + CSRF.
+- 접속 URL/도메인은 http(s) URL 또는 스킴 없는 도메인 허용, AI 모델 위험 판정은 폐기 모델도 prod 연결 시 위험으로 판정, 대시보드 AI API 예산은 만료된 항목 제외·통화별 합산.
+- 정/부 담당자 중복 지정 금지, 서비스 연결의 인증 방식에는 키처럼 보이는 문자열 거부.
+
+### 알려진 한계 / 운영 시 참고
+- 워커 1개 고정이며 로그인 잠금은 인메모리라 재기동하면 초기화된다 (계정/IP 5회 제한은 재기동 후 다시 시작).
+- 감사 로그/세션 외 데이터는 자동 삭제하지 않는다 (감사 로그는 수정·삭제 불가, 보관 정책은 운영 결정).
+- `X-Forwarded-For`는 프록시가 덮어쓴다는 전제로 신뢰한다 (README 4장).
+- 통합 검색의 부분 일치(LIKE)는 인덱스를 못 쓰지만 수백 대/수천 행 규모에서는 충분하다.
+- Starlette TestClient가 `httpx` 대신 `httpx2`를 권하는 deprecation 경고를 낸다 (허용된 개발 의존성은 `httpx`뿐이라 변경하지 않음, 동작에는 영향 없음).

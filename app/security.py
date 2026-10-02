@@ -247,6 +247,14 @@ def lookup_session(conn: sqlite3.Connection, raw: str | None, now: datetime | No
     )
 
 
+def purge_expired_sessions(conn: sqlite3.Connection, now: datetime | None = None) -> int:
+    """절대 만료/유휴 만료된 세션 행을 지운다 (다시 조회되지 않는 세션이 쌓이지 않게 기동 시와 로그인 시 호출)."""
+    now = now or datetime.now(timezone.utc)
+    idle_cutoff = now_iso(now - timedelta(seconds=config.SESSION_IDLE_SECONDS))
+    return conn.execute("DELETE FROM sessions WHERE expires_at <= ? OR last_seen_at <= ?",
+                        (now_iso(now), idle_cutoff)).rowcount
+
+
 def delete_session(conn: sqlite3.Connection, session_hash: str) -> None:
     conn.execute("DELETE FROM sessions WHERE id_hash = ?", (session_hash,))
 

@@ -60,6 +60,7 @@ async def lifespan(app: FastAPI):
     try:
         db.run_migrations(conn)
         password = security.bootstrap_admin(conn)
+        security.purge_expired_sessions(conn)
     finally:
         conn.close()
     if password:
