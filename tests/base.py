@@ -61,3 +61,87 @@ class DBTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             fn()
         self.assertIsInstance(cm.exception, __import__("sqlite3").IntegrityError)
+
+
+# --- 웹 테스트 ---
+import os  # noqa: E402
+from unittest import mock  # noqa: E402
+
+from fastapi import APIRouter, Depends, Request  # noqa: E402
+from fastapi.responses import JSONResponse, PlainTextResponse  # noqa: E402
+from starlette.testclient import TestClient  # noqa: E402
+
+from app import security  # noqa: E402
+from app.forms import csrf_form  # noqa: E402
+from app.main import create_app  # noqa: E402
+from app.security import require_login, require_role  # noqa: E402
+from app.templating import render  # noqa: E402
+
+FAST_SCRYPT = dict(SCRYPT_N=2**4, SCRYPT_R=8, SCRYPT_P=1)
+
+
+def make_test_app():
+    """보호된 테스트 전용 라우트를 가진 앱 (운영 앱에는 포함되지 않는다)."""
+    app = create_app()
+    router = APIRouter(dependencies=[Depends(require_login)])
+
+    @router.get("/t/ok")
+    def ok(user=Depends(require_login)):
+        return PlainTextResponse(user.username)
+
+    @router.get("/t/editor")
+    def editor(user=Depends(require_role("editor"))):
+        return PlainTextResponse("editor-ok")
+
+    @router.get("/t/admin")
+    def admin(user=Depends(require_role("admin"))):
+        return PlainTextResponse("admin-ok")
+
+    @router.post("/t/post")
+    def post(form=Depends(csrf_form), user=Depends(require_role("editor"))):
+        return JSONResponse(form)
+
+    @router.get("/t/page")
+    def page(request: Request):
+        return render(request, "error.html", {"status_code": 200, "message": "page"})
+
+    @router.get("/t/int")
+    def int_param(n: int):
+        return PlainTextResponse(str(n))
+
+    @router.get("/t/boom")
+    def boom():
+        raise RuntimeError("secret-internal-detail")
+
+    @router.get("/password")
+    def password_page():
+        return PlainTextResponse("password-page")
+
+    app.include_router(router)
+    return app
+
+
+class WebTestCase(DBTestCase):
+    def setUp(self):
+        super().setUp()
+        for name, value in FAST_SCRYPT.items():
+            patcher = mock.patch.object(config, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        security._dummy_hash = None
+        security.login_limiter = security.LoginLimiter()
+        self.addCleanup(setattr, security, "_dummy_hash", None)
+        self.client = TestClient(make_test_app(), base_url="https://testserver", follow_redirects=False,
+                                 raise_server_exceptions=False)
+        self.client.__enter__()
+        self.addCleanup(self.client.__exit__, None, None, None)
+
+    def login_as(self, uid) -> str:
+        """세션을 직접 만들어 쿠키를 심는다. CSRF 토큰을 반환한다."""
+        raw = security.create_session(self.conn, uid)
+        self.client.cookies.set(config.SESSION_COOKIE, raw, domain="testserver.local")
+        return self.conn.execute("SELECT csrf_token FROM sessions WHERE user_id=? ORDER BY created_at DESC",
+                                 (uid,)).fetchone()[0]
+
+    def post(self, path, data, **kw):
+        return self.client.post(path, data=data, headers={"content-type": "application/x-www-form-urlencoded"}, **kw)

@@ -1,0 +1,25 @@
+{# 공통 매크로. 자동 이스케이프에 의존한다 (이스케이프 우회 금지). #}
+
+{% macro csrf_input(token) -%}
+<input type="hidden" name="csrf_token" value="{{ token }}">
+{%- endmacro %}
+
+{% macro field_error(errors, name) -%}
+{% if errors and errors.get(name) %}<span class="field-error" role="alert">{{ errors[name] }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro text_field(name, label, values, errors, type="text", required=False, maxlength=None, autocomplete=None) -%}
+<div class="field{% if errors and errors.get(name) %} has-error{% endif %}">
+  <label for="f-{{ name }}">{{ label }}{% if required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+  <input id="f-{{ name }}" name="{{ name }}" type="{{ type }}"
+         {% if type != "password" %}value="{{ values.get(name, '') if values else '' }}"{% endif %}
+         {% if required %}required{% endif %}
+         {% if maxlength %}maxlength="{{ maxlength }}"{% endif %}
+         {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}>
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}
+
+{% macro badge(text, kind="gray") -%}
+<span class="badge badge-{{ kind }}">{{ text }}</span>
+{%- endmacro %}

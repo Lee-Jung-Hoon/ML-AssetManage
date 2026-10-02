@@ -12,6 +12,15 @@ MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 _MIGRATION_NAME = re.compile(r"^(\d{3})_[a-z0-9_]+\.sql$")
 
 
+def now_iso(now: datetime | None = None) -> str:
+    """UTC ISO8601 문자열 (저장 형식). 문자열 비교로 시간 순서 비교가 가능하다."""
+    return (now or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def parse_iso(value: str) -> datetime:
+    return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+
+
 def connect() -> sqlite3.Connection:
     # isolation_level=None: 트랜잭션은 transaction()으로 명시 제어한다.
     # check_same_thread=False: FastAPI가 yield 의존성의 시작/종료를 서로 다른 스레드에서 실행할 수 있다.
@@ -75,7 +84,7 @@ def run_migrations(conn: sqlite3.Connection) -> list[int]:
             conn.executescript("BEGIN IMMEDIATE;\n" + sql)
             conn.execute(
                 "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
-                (version, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")),
+                (version, now_iso()),
             )
             conn.execute("COMMIT")
         except BaseException:
