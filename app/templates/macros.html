@@ -221,3 +221,24 @@
   <button type="submit" class="secondary">CSV 내보내기</button>
 </form>
 {%- endmacro %}
+
+{# 건수 표 + CSS 막대 (items: [{label, count, pct}]) #}
+{% macro count_table(items, kind="gray") -%}
+{% if items %}
+<table class="compact">
+  <tbody>
+  {% for i in items %}
+    <tr><td>{{ i.label }}</td><td class="num">{{ i.count }}</td>
+        <td><span class="bar" aria-hidden="true"><span class="bar-fill bar-{{ kind }} {{ usage_class(i.pct) }}"></span></span></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="muted">데이터가 없습니다.</p>{% endif %}
+{%- endmacro %}
+
+{% macro stat_card(label, value, href=None, level=None) -%}
+<div class="card{% if level %} card-{{ level }}{% endif %}">
+  <div class="card-num">{{ value }}</div>
+  <div class="card-label">{% if href %}<a href="{{ href }}">{{ label }}</a>{% else %}{{ label }}{% endif %}</div>
+</div>
+{%- endmacro %}
