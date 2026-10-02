@@ -229,3 +229,22 @@
 
 ### 남은 이슈
 - 대시보드는 요청마다 집계 쿼리를 실행한다(수백 대 규모 + SQLite에서 충분). 데이터가 크게 늘면 캐시를 고려한다.
+
+## 13단계: 백업, Dockerfile, docker-compose — 완료
+- 만든 것: `app/routers/backup.py` + `templates/backup.html`, `Dockerfile`(멀티스테이지), `docker-compose.yml`(명세 그대로), `.dockerignore`, `requirements.txt`(pip-compile `--generate-hashes`로 전이 의존성까지 해시 고정), `tests/test_backup.py`, `tests/test_packaging.py`
+- 테스트: 500개 통과 (패키징/정책 점검 포함: 허용 의존성 외 패키지 금지, 해시 고정, Dockerfile/compose 형태, 앱 import는 표준 라이브러리+허용 패키지만, SQL 조립/템플릿 우회/인라인 script·style/외부 리소스/환경변수는 `ADMIN_ENABLED` 하나만).
+- `pip-audit -r requirements.txt --disable-pip`: **No known vulnerabilities found** (개발 환경 `.venv`에서만 실행, pip-audit/pip-tools는 이미지에 포함되지 않는다).
+
+### 실제 컨테이너 검증 (이 세션에서 dockerd를 띄워 확인)
+- 이미지 빌드 성공(237MB). 이 샌드박스는 TLS를 재종단하는 프록시를 쓰므로 검증용 빌드에서만 프록시 CA(`/root/.ccr/ca-bundle.crt`)를 build context로 주입했고(저장소의 Dockerfile은 그대로, TLS 검증 해제 없음) `--require-hashes` 설치가 통과했다. 일반 환경에서는 `docker compose up -d --build`가 그대로 동작한다.
+- compose와 같은 옵션(`--read-only --tmpfs /tmp --cap-drop ALL --no-new-privileges --memory 512m`, `127.0.0.1:8080`)으로 실행: 유저 uid 10001, `/srv` 쓰기 시도는 `Read-only file system`, pip/setuptools 없음(venv와 시스템 파이썬 모두), HEALTHCHECK `healthy`, `/data/secret.key` 모드 600, `/data/backups` 700, 응답 헤더(CSP 등) 적용·`server:` 헤더 없음, `/docs` 404.
+- 실제 uvicorn(프록시 헤더 신뢰) 경유 흐름 확인: 초기 비밀번호 로그 1회 출력 → admin 로그인 → 비밀번호 변경 강제 → 변경 → 대시보드 → **백업 생성**(`app-YYYYMMDD-HHMMSS.db`, 모드 600, 열어보면 users 포함) → `X-Forwarded-For`로 보낸 IP가 감사 로그에 기록됨 → 다운로드/정적 경로 우회(`/backups/..`, `/static/../`)는 404. 컨테이너 재시작 후 `secret.key` 동일, 초기 비밀번호 재출력 없음. `docker exec ... python -m app reset-admin` 동작, `ADMIN_ENABLED=false`에서 admin 로그인 401(CLI는 무관하게 동작).
+
+### 주요 결정
+- **백업**: `VACUUM INTO ?`(바인딩) → `/data/backups/app-YYYYMMDD-HHMMSS.db`(KST 시각), 파일 모드 600/디렉터리 700, 최근 14개만 보관(이름 형식이 맞는 파일만 삭제, 다른 파일은 건드리지 않음), 같은 초에 두 번 누르면 기존 파일을 덮어쓰지 않고 안내. 실패 시 화면에는 일반 문구만(경로/예외 상세는 서버 로그에 타입만). 감사 로그 `backup_create`(파일명·크기·삭제 개수). **다운로드 기능 없음**(`/backup`은 목록만, 링크 없음, 정적 경로로도 접근 불가). 페이지에 `secret.key` 동반 보관과 볼륨 백업본 기밀 취급 경고를 표시.
+- **Dockerfile**: build 스테이지에서 venv 생성 후 `pip install --require-hashes`, 설치 뒤 venv의 pip/setuptools 제거. 최종 스테이지는 `python:3.13-slim`에 시스템 pip/setuptools/wheel도 제거하고 venv와 `app/`만 복사, uid/gid 10001 고정(`USER 10001:10001`), `/data`와 `/data/backups`를 해당 uid 소유로 미리 만들어 named volume이 같은 권한을 상속. `PYTHONDONTWRITEBYTECODE=1`, `PYTHONUNBUFFERED=1`, `HEALTHCHECK`(`python -m app healthcheck`), `CMD ["python","-m","app","serve"]`.
+- **전이 의존성**: `fastapi`가 `opentelemetry-api`, `annotated-doc` 등을 끌어온다(허용 목록의 전이 의존성). 모두 해시로 고정되어 있고, `tests/test_packaging.py`가 이 집합이 바뀌면 실패하도록 해 새 패키지가 조용히 들어오지 못하게 한다.
+- `.dockerignore`로 `.git`, `.venv`, `tests`, `*.db`, 문서 등을 이미지에서 제외.
+
+### 남은 이슈
+- Caddy 예시, XFF 신뢰 근거 등 문서는 14단계 README에서 작성.

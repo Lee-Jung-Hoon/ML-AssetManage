@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}백업{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>백업</h1>
+  <form method="post" action="/backup" class="inline-form">
+    {{ m.csrf_input(csrf_token) }}
+    <button type="submit">백업 생성</button>
+  </form>
+</div>
+<p>SQLite <code>VACUUM INTO</code>로 일관된 스냅샷을 <code>/data/backups/</code>에 만들고 최근 {{ keep }}개만 보관합니다. 웹에서 백업 파일을 내려받는 기능은 없습니다 (유출 경로 차단). 호스트에서 Docker 볼륨으로 가져가세요.</p>
+<div class="warn-box" role="note">
+  <strong>키와 백업의 보관 주의</strong>
+  <ul>
+    <li><code>secret.key</code> 없이는 암호화 필드(라이선스 키/계정 정보)를 복구할 수 없습니다. <strong>키 파일도 반드시 함께 보관</strong>하세요.</li>
+    <li>키와 DB가 같은 볼륨에 있으므로 <strong>볼륨 백업본 자체를 기밀로 취급</strong>해야 합니다.</li>
+  </ul>
+</div>
+<table>
+  <thead><tr><th>파일</th><th>크기</th><th>수정 시각 (KST)</th></tr></thead>
+  <tbody>
+  {% for b in backups %}
+    <tr><td>{{ b.name }}</td><td class="num">{{ "{:,}".format(b.size) }} bytes</td><td>{{ b.modified }}</td></tr>
+  {% else %}
+    <tr><td colspan="3" class="muted">생성된 백업이 없습니다.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

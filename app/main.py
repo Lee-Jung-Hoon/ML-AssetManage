@@ -12,8 +12,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import config, db, security
 from .routers import audit as audit_router
-from .routers import (acls, auth, dashboard, exports, licenses, models, search, server_import, server_items, servers,
-                      services, tags, users)
+from .routers import (acls, auth, backup, dashboard, exports, licenses, models, search, server_import, server_items,
+                      servers, services, tags, users)
 from .security import LoginRequired, PasswordChangeRequired, safe_redirect_path
 from .templating import render
 
@@ -54,6 +54,7 @@ def error_response(request: Request, status_code: int) -> Response:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     config.DATA_DIR.mkdir(parents=True, exist_ok=True)
+    (config.DATA_DIR / "backups").mkdir(mode=0o700, exist_ok=True)
     app.state.secret_key = security.load_or_create_key()    # 손상 시 예외 → 기동 실패
     conn = db.connect()
     try:
@@ -112,6 +113,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(dashboard.router)
     app.include_router(users.router)
+    app.include_router(backup.router)
     app.include_router(exports.router)
     app.include_router(acls.router)
     app.include_router(server_import.router)
