@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}{{ "서비스 수정" if target else "서비스 등록" }}{% endblock %}
+{% block content %}
+<h1>{{ "서비스 수정" if target else "서비스 등록" }}</h1>
+{% if errors %}<div class="flash flash-error" role="alert">입력값을 확인하세요.</div>{% endif %}
+<form class="form-wide" method="post" action="{{ '/services/%d/edit' % target.id if target else '/services/new' }}">
+  {{ m.csrf_input(csrf_token) }}
+  {{ m.field_error(errors, "__all__") }}
+  <div class="form-grid">
+    {{ m.text_field("name", "서비스명", values, errors, required=True, maxlength=100) }}
+    {{ m.text_field("code", "서비스 코드 (영문 대문자·숫자·하이픈, 예: PAY-API)", values, errors, required=True, maxlength=50) }}
+    {{ m.select_field("category", "분류", category_options, values, errors, required=True) }}
+    {{ m.select_field("environment", "환경", env_options, values, errors, required=True) }}
+    {{ m.select_field("status", "상태", status_options, values, errors, required=True) }}
+    {{ m.select_field("tier", "중요도", tier_options, values, errors, required=True) }}
+    {{ m.text_field("team", "담당 팀", values, errors, maxlength=100) }}
+    {{ m.select_field("deploy_method", "배포 방식", deploy_options, values, errors, required=True) }}
+    {{ m.select_field("serving_engine", "서빙 엔진 (분류가 'AI 추론'일 때만 저장됨)", engine_options, values, errors, blank="선택 안 함") }}
+    {{ m.text_field("tech_stack", "기술 스택 (예: FastAPI, PostgreSQL 16, Redis)", values, errors, maxlength=500) }}
+    {{ m.owner_select("primary_owner_id", "정 담당자", primary_opts, values, errors) }}
+    {{ m.owner_select("secondary_owner_id", "부 담당자", secondary_opts, values, errors) }}
+    {{ m.text_field("repo_url", "소스 저장소 URL (http/https)", values, errors, maxlength=500) }}
+    {{ m.text_field("doc_url", "문서/런북 URL (http/https)", values, errors, maxlength=500) }}
+    <div class="span2">{{ m.textarea_field("urls", "접속 URL/도메인 (줄바꿈으로 구분, http(s):// URL 또는 도메인)", values, errors, rows=3, maxlength=4000) }}</div>
+    <div class="span2">{{ m.tags_field(values, errors) }}</div>
+    <div class="span2">{{ m.textarea_field("description", "설명 (이 서비스가 무엇을 하는지)", values, errors, rows=4, maxlength=4000, required=True) }}</div>
+    <div class="span2">{{ m.textarea_field("notes", "비고", values, errors, maxlength=4000) }}</div>
+  </div>
+  <p class="muted">구동 서버와 연결 관계는 저장 후 상세 화면에서 추가합니다. 수정은 '내용 확인 완료'로 간주되지 않습니다.</p>
+  <div class="actions">
+    <button type="submit">저장</button>
+    <a class="button secondary" href="{{ '/services/%d' % target.id if target else '/services' }}">취소</a>
+  </div>
+</form>
+{% endblock %}

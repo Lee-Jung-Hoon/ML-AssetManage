@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}구동 서버 {{ "수정" if server_id else "연결" }}{% endblock %}
+{% block content %}
+<h1>구동 서버 {{ "수정" if server_id else "연결" }} <small class="muted">{{ s.name }} ({{ s.code }})</small></h1>
+{% if errors %}<div class="flash flash-error" role="alert">입력값을 확인하세요.</div>{% endif %}
+<form class="form-narrow" method="post"
+      action="{{ '/services/%d/servers/%d/edit' % (s.id, server_id) if server_id else '/services/%d/servers/new' % s.id }}">
+  {{ m.csrf_input(csrf_token) }}
+  {% if server_id %}
+  <div class="field"><label>서버</label><div>{{ server.name }} ({{ server.hostname }})</div></div>
+  {% else %}
+  {{ m.select_field("server_id", "서버", server_options, values, errors, required=True, blank="서버를 선택하세요") }}
+  {% endif %}
+  {{ m.select_field("role", "역할", role_options, values, errors, required=True) }}
+  {{ m.text_field("note", "비고", values, errors, maxlength=500) }}
+  <div class="actions">
+    <button type="submit">저장</button>
+    <a class="button secondary" href="/services/{{ s.id }}#servers">취소</a>
+  </div>
+</form>
+{% if server_id %}
+<hr>
+<form method="post" action="/services/{{ s.id }}/servers/{{ server_id }}/delete">
+  {{ m.csrf_input(csrf_token) }}
+  <p>이 서버와의 연결을 해제합니다 (서버 자체는 삭제되지 않습니다).</p>
+  <button type="submit" class="danger">연결 해제</button>
+</form>
+{% endif %}
+{% endblock %}

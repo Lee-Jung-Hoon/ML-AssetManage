@@ -384,3 +384,140 @@ class ACLForm(FormModel):
         if v is not None and requested is not None and v < requested:
             raise ValueError("만료일은 요청일보다 빠를 수 없습니다.")
         return v
+
+
+# ------------------------------------------------------------------ 서비스 (7단계)
+from urllib.parse import urlsplit  # noqa: E402
+
+SERVICE_CATEGORIES = ("웹", "API", "배치", "DB", "메시지 큐", "모니터링", "내부 도구", "AI 추론", "AI 학습",
+                      "데이터 파이프라인", "기타")
+SERVICE_STATUSES = ("운영중", "개발중", "점검", "종료예정", "종료")
+DEPLOY_METHODS = ("Docker", "Docker Compose", "Kubernetes", "systemd", "IIS", "기타")
+SERVING_ENGINES = ("vLLM", "SGLang", "Triton", "TGI", "Ollama", "TorchServe", "자체 구현", "기타")
+SERVICE_ROLES = ("WEB", "WAS", "API", "DB", "캐시", "배치", "LB", "기타")
+LINK_PROTOCOLS = ("HTTP", "HTTPS", "gRPC", "TCP", "DB", "MQ", "SFTP", "SMTP", "기타")
+TIERS = (1, 2, 3)
+
+_SERVICE_CODE = re.compile(r"[A-Z0-9]+(-[A-Z0-9]+)*")
+_BARE_DOMAIN = re.compile(r"[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?(/[^\s]*)?")
+MAX_ACCESS_URLS = 20
+
+
+def _http_url(value: str) -> str:
+    """http://, https:// 만 허용한다 (javascript:, data: 등 차단). URL에 계정 정보는 넣을 수 없다."""
+    if value == "":
+        return value
+    if any(c.isspace() or ord(c) < 0x20 for c in value):
+        raise ValueError("URL에 공백이나 제어 문자를 넣을 수 없습니다.")
+    parts = urlsplit(value)
+    if parts.scheme.lower() not in ("http", "https") or not parts.hostname:
+        raise ValueError("http:// 또는 https:// 로 시작하는 URL만 입력할 수 있습니다.")
+    if parts.username or parts.password:
+        raise ValueError("URL에 계정 정보를 포함할 수 없습니다.")
+    return value
+
+
+def _access_urls(value: str) -> str:
+    """접속 URL/도메인 (줄바꿈 구분). 각 줄은 http(s) URL이거나 스킴 없는 도메인이어야 한다."""
+    lines = [line.strip() for line in value.replace("\r\n", "\n").replace("\r", "\n").split("\n") if line.strip()]
+    if len(lines) > MAX_ACCESS_URLS:
+        raise ValueError(f"접속 URL/도메인은 최대 {MAX_ACCESS_URLS}개까지 입력할 수 있습니다.")
+    for line in lines:
+        if len(line) > 500:
+            raise ValueError("각 줄은 500자 이하여야 합니다.")
+        if "://" in line:
+            _http_url(line)
+        elif not _BARE_DOMAIN.fullmatch(line):
+            raise ValueError("각 줄은 http(s):// URL 또는 도메인이어야 합니다 (javascript:, data: 등은 허용되지 않습니다).")
+    return "\n".join(lines)
+
+
+def _service_code(value: str) -> str:
+    if not _SERVICE_CODE.fullmatch(value):
+        raise ValueError("서비스 코드는 영문 대문자, 숫자, 하이픈만 사용할 수 있습니다 (예: PAY-API).")
+    return value
+
+
+def _auth_method(value: str) -> str:
+    """인증 정보 자체는 저장하지 않는다: 방식 이름만 받고, 키/토큰처럼 보이는 긴 연속 문자열은 거부한다."""
+    if len(value) > 40 and not any(c.isspace() for c in value):
+        raise ValueError("인증 방식의 이름만 입력하세요 (키, 비밀번호, 토큰 등 인증 정보는 입력 금지).")
+    return value
+
+
+HttpUrl = Annotated[str, Field(max_length=500), AfterValidator(_http_url)]
+ServiceCode = Annotated[str, Field(min_length=1, max_length=50), AfterValidator(_service_code)]
+AccessUrls = Annotated[str, Field(max_length=4000), AfterValidator(_access_urls)]
+
+
+class ServiceForm(FormModel):
+    name: str = Field(min_length=1, max_length=100)
+    code: ServiceCode
+    description: Annotated[str, AfterValidator(_multiline)] = Field(min_length=1, max_length=4000)
+    category: Literal[*SERVICE_CATEGORIES]
+    environment: Literal[*ENVIRONMENTS]
+    status: Literal[*SERVICE_STATUSES]
+    tier: int = Field(ge=1, le=3)
+    team: str = Field(default="", max_length=100)
+    urls: AccessUrls = ""
+    repo_url: HttpUrl = ""
+    doc_url: HttpUrl = ""
+    tech_stack: str = Field(default="", max_length=500)
+    deploy_method: Literal[*DEPLOY_METHODS]
+    serving_engine: opt_choice(*SERVING_ENGINES) = Field(default="", validate_default=True)
+    notes: Annotated[str, AfterValidator(_multiline)] = Field(default="", max_length=4000)
+    primary_owner_id: OptInt = None
+    secondary_owner_id: OptInt = None
+    tags: Tags = []
+
+    @field_validator("serving_engine")
+    @classmethod
+    def _engine_only_for_inference(cls, v: str, info) -> str:
+        # AI 추론이 아닌 분류로 제출되면 서버측에서 값을 비워 저장한다.
+        return v if info.data.get("category") == "AI 추론" else ""
+
+    @model_validator(mode="after")
+    def _distinct_owners(self):
+        if self.primary_owner_id is not None and self.primary_owner_id == self.secondary_owner_id:
+            raise ValueError("정 담당자와 부 담당자는 서로 다른 사용자여야 합니다.")
+        return self
+
+
+class ServiceFilter(FormModel):
+    q: str = Field(default="", max_length=100)
+    category: opt_choice(*SERVICE_CATEGORIES) = ""
+    environment: opt_choice(*ENVIRONMENTS) = ""
+    status: opt_choice(*SERVICE_STATUSES) = ""
+    tier: opt_choice("1", "2", "3") = ""
+    tag: str = Field(default="", max_length=30)
+    owner_id: OptInt = None
+    mine: Flag = False
+    stale: Flag = False
+    sort: Literal["name", "updated", "verified"] = "name"
+    page: int = Field(default=1, ge=1, le=100000)
+
+
+class ServiceServerCreateForm(FormModel):
+    server_id: int = Field(ge=1)
+    role: Literal[*SERVICE_ROLES]
+    note: str = Field(default="", max_length=500)
+
+
+class ServiceServerEditForm(FormModel):
+    role: Literal[*SERVICE_ROLES]
+    note: str = Field(default="", max_length=500)
+
+
+class ServiceLinkForm(FormModel):
+    target_service_id: OptInt = None
+    external_name: str = Field(default="", max_length=100)
+    protocol: Literal[*LINK_PROTOCOLS]
+    port: opt_int(1, 65535) = None
+    purpose: str = Field(default="", max_length=500)
+    auth_method: Annotated[str, AfterValidator(_auth_method)] = Field(default="", max_length=100)
+
+    @model_validator(mode="after")
+    def _exactly_one_target(self):
+        if (self.target_service_id is None) == (self.external_name == ""):
+            raise ValueError("내부 서비스와 외부 시스템 중 정확히 하나만 지정하세요.")
+        return self

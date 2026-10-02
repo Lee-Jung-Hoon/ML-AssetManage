@@ -9,7 +9,7 @@
   <strong>이 서버에서 구동 중인 서비스가 {{ services | length }}개 있습니다.</strong> 삭제하면 서비스와의 연결이 끊어집니다.
   <ul>
   {% for sv in services %}
-    <li><a href="/services/{{ sv.id }}">{{ sv.name }}</a> ({{ sv.code }}) · Tier {{ sv.tier }} · {{ sv.status }}</li>
+    <li><a href="/services/{{ sv.id }}">{{ sv.name }}</a> ({{ sv.code }}) {{ m.tier_badge(sv.tier) }} · {{ sv.status }}</li>
   {% endfor %}
   </ul>
 </div>

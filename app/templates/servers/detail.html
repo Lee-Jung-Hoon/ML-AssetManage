@@ -60,6 +60,21 @@
 </section>
 {% endfor %}
 
+<section class="section" id="services">
+  <h2>구동 중인 서비스 ({{ services | length }})</h2>
+  {% if services %}
+  <table>
+    <thead><tr><th>서비스</th><th>중요도</th><th>상태</th></tr></thead>
+    <tbody>
+    {% for sv in services %}
+      <tr><td><a href="/services/{{ sv.id }}">{{ sv.name }}</a> <span class="muted">({{ sv.code }})</span></td>
+          <td>{{ m.tier_badge(sv.tier) }}</td><td>{{ sv.status }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">이 서버에서 구동 중인 서비스가 없습니다.</p>{% endif %}
+</section>
+
 {{ m.notes_section(notes, "/servers/%d" % s.id, can_write, user, csrf_token, today) }}
 {{ m.history_section(history) }}
 {% endblock %}

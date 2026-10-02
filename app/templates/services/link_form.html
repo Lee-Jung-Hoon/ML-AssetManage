@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}연결 관계 {{ "수정" if link_id else "추가" }}{% endblock %}
+{% block content %}
+<h1>연결 관계 {{ "수정" if link_id else "추가" }} <small class="muted">{{ s.name }} ({{ s.code }})</small></h1>
+{% if errors %}<div class="flash flash-error" role="alert">입력값을 확인하세요.</div>{% endif %}
+<form class="form-narrow" method="post"
+      action="{{ '/services/%d/links/%d/edit' % (s.id, link_id) if link_id else '/services/%d/links/new' % s.id }}">
+  {{ m.csrf_input(csrf_token) }}
+  {{ m.field_error(errors, "__all__") }}
+  <p class="muted">연결 대상은 <strong>내부 서비스</strong>와 <strong>외부 시스템</strong> 중 정확히 하나만 지정합니다.</p>
+  {{ m.select_field("target_service_id", "내부 서비스", target_options, values, errors, blank="(선택 안 함)") }}
+  {{ m.text_field("external_name", "외부 시스템 이름 (예: 토스페이먼츠 API, AWS S3)", values, errors, maxlength=100) }}
+  {{ m.select_field("protocol", "프로토콜", protocol_options, values, errors, required=True) }}
+  {{ m.text_field("port", "포트", values, errors, type="number") }}
+  {{ m.text_field("purpose", "용도 설명 (예: 결제 승인 요청)", values, errors, maxlength=500) }}
+  {{ m.text_field("auth_method", "인증 방식 (예: API Key, mTLS, IP 화이트리스트)", values, errors, maxlength=100) }}
+  <p class="muted">인증 정보(키, 비밀번호, 토큰) 자체는 저장하지 않습니다. 방식의 이름만 입력하세요.</p>
+  <div class="actions">
+    <button type="submit">저장</button>
+    <a class="button secondary" href="/services/{{ s.id }}#links">취소</a>
+  </div>
+</form>
+{% if link_id %}
+<hr>
+<form method="post" action="/services/{{ s.id }}/links/{{ link_id }}/delete">
+  {{ m.csrf_input(csrf_token) }}
+  <p>이 연결 관계를 삭제합니다.</p>
+  <button type="submit" class="danger">삭제</button>
+</form>
+{% endif %}
+{% endblock %}

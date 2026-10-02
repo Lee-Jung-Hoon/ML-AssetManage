@@ -180,3 +180,18 @@
 {% elif c.muted %}<span class="muted">{{ c.text }}</span>
 {% else %}{{ c.text }}{% endif %}
 {%- endmacro %}
+
+{# 접속 URL/도메인 목록 (줄바꿈 구분). http(s)만 링크로 만들고 나머지는 텍스트로 표시한다. #}
+{% macro url_list(text) -%}
+{% for line in text.splitlines() %}
+  <div>{% if line.startswith("http://") or line.startswith("https://") %}<a href="{{ line }}" rel="noopener noreferrer" target="_blank">{{ line }}</a>{% else %}{{ line }}{% endif %}</div>
+{% endfor %}
+{%- endmacro %}
+
+{% macro url_link(url) -%}
+{% if url.startswith("http://") or url.startswith("https://") %}<a href="{{ url }}" rel="noopener noreferrer" target="_blank">{{ url }}</a>{% else %}{{ url }}{% endif %}
+{%- endmacro %}
+
+{% macro tier_badge(tier) -%}
+{{ badge("Tier " ~ tier, {1: "red", 2: "orange", 3: "gray"}[tier]) }}
+{%- endmacro %}

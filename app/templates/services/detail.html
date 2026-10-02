@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}{{ s.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ s.name }} <small class="muted">{{ s.code }}</small></h1>
+  <div class="actions">
+    {% if can_write %}
+    {{ m.verify_form("/services/%d/verify" % s.id, csrf_token) }}
+    <a class="button" href="/services/{{ s.id }}/edit">수정</a>
+    <a class="button secondary" href="/services/{{ s.id }}/delete">삭제</a>
+    {% endif %}
+    <a class="button secondary" href="/services">목록</a>
+  </div>
+</div>
+
+<section class="section">
+  <h2>기본 정보</h2>
+  <dl class="detail-grid">
+    <dt>상태</dt><dd>{{ m.badge(s.status, {"운영중": "green", "개발중": "gray", "점검": "orange", "종료예정": "orange", "종료": "gray"}[s.status]) }}
+        {{ m.badge(s.environment, "gray") }} {{ m.tier_badge(s.tier) }} {{ s.category }}</dd>
+    <dt>설명</dt><dd class="pre">{{ s.description }}</dd>
+    <dt>담당 팀</dt><dd>{{ s.team }}</dd>
+    <dt>담당자 (정)</dt><dd>{{ m.owner_cell(s.primary_name, s.primary_active) }}</dd>
+    <dt>담당자 (부)</dt><dd>{{ m.owner_cell(s.secondary_name, s.secondary_active) }}</dd>
+    <dt>접속 URL/도메인</dt><dd>{{ m.url_list(s.urls) }}</dd>
+    <dt>소스 저장소</dt><dd>{{ m.url_link(s.repo_url) }}</dd>
+    <dt>문서/런북</dt><dd>{{ m.url_link(s.doc_url) }}</dd>
+    <dt>기술 스택</dt><dd>{{ s.tech_stack }}</dd>
+    <dt>배포 방식</dt><dd>{{ s.deploy_method }}{% if s.serving_engine %} · 서빙 엔진 {{ s.serving_engine }}{% endif %}</dd>
+    <dt>태그</dt><dd>{{ m.tag_list(tags) }}</dd>
+    <dt>최신성</dt><dd>{{ m.verify_badge(s.last_verified_at) }}{% if s.verified_by_name %} <span class="muted">({{ s.verified_by_name }}, {{ s.last_verified_at | kst }})</span>{% endif %}</dd>
+    <dt>비고</dt><dd class="pre">{{ s.notes }}</dd>
+    <dt>생성</dt><dd>{{ s.created_at | kst }} · {{ s.created_by_name }}</dd>
+    <dt>수정</dt><dd>{{ s.updated_at | kst }} · {{ s.updated_by_name }}</dd>
+  </dl>
+</section>
+
+<section class="section" id="servers">
+  <div class="page-head">
+    <h2>구동 서버 ({{ servers | length }})</h2>
+    {% if can_write %}<a class="button secondary" href="/services/{{ s.id }}/servers/new">서버 연결</a>{% endif %}
+  </div>
+  {% if servers %}
+  <table>
+    <thead><tr><th>서버</th><th>호스트명</th><th>환경</th><th>상태</th><th>역할</th><th>비고</th>{% if can_write %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for sv in servers %}
+      <tr>
+        <td><a href="/servers/{{ sv.server_id }}">{{ sv.name }}</a></td><td>{{ sv.hostname }}</td>
+        <td>{{ m.badge(sv.environment, "gray") }}</td><td>{{ sv.status }}</td><td>{{ sv.role }}</td><td>{{ sv.note }}</td>
+        {% if can_write %}<td><a href="/services/{{ s.id }}/servers/{{ sv.server_id }}/edit">수정</a></td>{% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">연결된 서버가 없습니다.</p>{% endif %}
+</section>
+
+<section class="section" id="links">
+  <div class="page-head">
+    <h2>연결 관계</h2>
+    {% if can_write %}<a class="button secondary" href="/services/{{ s.id }}/links/new">연결 추가</a>{% endif %}
+  </div>
+  <h3>이 서비스가 의존하는 대상 (나가는 연결)</h3>
+  {% if outgoing %}
+  <table>
+    <thead><tr><th>대상</th><th>프로토콜</th><th>포트</th><th>용도</th><th>인증 방식</th>{% if can_write %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for l in outgoing %}
+      <tr>
+        <td>{% if l.target_service_id %}<a href="/services/{{ l.target_service_id }}">{{ l.target_name }}</a> <span class="muted">({{ l.target_code }})</span> {{ m.tier_badge(l.target_tier) }}
+            {% else %}{{ l.external_name }} {{ m.badge("외부", "gray") }}{% endif %}</td>
+        <td>{{ l.protocol }}</td><td>{{ l.port or "" }}</td><td>{{ l.purpose }}</td><td>{{ l.auth_method }}</td>
+        {% if can_write %}<td><a href="/services/{{ s.id }}/links/{{ l.id }}/edit">수정</a></td>{% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">등록된 나가는 연결이 없습니다.</p>{% endif %}
+
+  <h3>이 서비스에 의존하는 서비스 (들어오는 연결)</h3>
+  {% if incoming %}
+  <table>
+    <thead><tr><th>서비스</th><th>중요도</th><th>상태</th><th>프로토콜</th><th>포트</th><th>용도</th></tr></thead>
+    <tbody>
+    {% for l in incoming %}
+      <tr>
+        <td><a href="/services/{{ l.source_id }}">{{ l.source_name }}</a> <span class="muted">({{ l.source_code }})</span></td>
+        <td>{{ m.tier_badge(l.source_tier) }}</td><td>{{ l.source_status }}</td>
+        <td>{{ l.protocol }}</td><td>{{ l.port or "" }}</td><td>{{ l.purpose }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">이 서비스에 의존하는 서비스가 없습니다.</p>{% endif %}
+</section>
+
+{{ m.notes_section(notes, "/services/%d" % s.id, can_write, user, csrf_token, today) }}
+{{ m.history_section(history) }}
+{% endblock %}
