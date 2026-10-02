@@ -228,7 +228,25 @@ Uvicorn은 `--proxy-headers --forwarded-allow-ips="*"`로 구동됩니다.
 
 ---
 
-## 8. 개발
+## 9. 화면 미리보기
+
+가상의 예시 데이터(실제 폼 라우트로 입력)로 캡처한 화면입니다. 파일은 `docs/screenshots/`에 있습니다.
+
+| 화면 | 파일 |
+|---|---|
+| 로그인 | [01-login](docs/screenshots/01-login.png) |
+| 대시보드 (긴급 알림, 요약, 디스크/GPU/AI 모델/라이선스 현황) | [02-dashboard](docs/screenshots/02-dashboard.png) |
+| 서버 목록 / GPU 필터 | [03-servers-list](docs/screenshots/03-servers-list.png) · [04-servers-gpu-filter](docs/screenshots/04-servers-gpu-filter.png) |
+| 서버 상세 (IP·디스크·호스트 서비스·ACL·구동 서비스·라이선스·메모·변경 이력) | [05-server-detail](docs/screenshots/05-server-detail.png) |
+| GPU 서버 상세 (GPU·컨테이너) / GPU 입력 폼 | [06-server-detail-gpu-containers](docs/screenshots/06-server-detail-gpu-containers.png) · [07-server-gpu-form](docs/screenshots/07-server-gpu-form.png) |
+| 서비스 목록 / 상세 (구동 서버, 나가는·들어오는 연결, 사용 AI 모델) | [08-services-list](docs/screenshots/08-services-list.png) · [09-service-detail](docs/screenshots/09-service-detail.png) |
+| AI 모델 목록 (라이선스 위험·조건 확인 배지) / 상세 | [10-models-list](docs/screenshots/10-models-list.png) · [11-model-detail](docs/screenshots/11-model-detail.png) |
+| 라이선스 목록 / SSL 상세 / 마스킹된 민감 정보 / AI API 상세 / 입력 폼 | [12](docs/screenshots/12-licenses-list.png) · [13](docs/screenshots/13-license-detail-ssl.png) · [14](docs/screenshots/14-license-detail-masked-secret.png) · [15](docs/screenshots/15-license-detail-ai-api.png) · [16](docs/screenshots/16-license-form.png) |
+| 통합 검색 (IP로 ACL 조회) / ACL 전체 목록 / 태그 관리 | [17](docs/screenshots/17-search-ip-acl.png) · [18](docs/screenshots/18-acls-all.png) · [19](docs/screenshots/19-tags.png) |
+| CSV 일괄 등록 미리보기 (행별 오류 사유) | [20-bulk-import-preview](docs/screenshots/20-bulk-import-preview.png) |
+| 사용자 관리 / 감사 로그 / 백업 / 오류 페이지 | [21](docs/screenshots/21-users.png) · [22](docs/screenshots/22-audit-log.png) · [23](docs/screenshots/23-backup.png) · [24](docs/screenshots/24-error-404.png) |
+
+## 10. 개발
 
 ```bash
 python3.13 -m venv .venv && .venv/bin/pip install -r requirements-dev.in   # 개발용 (httpx, pip-audit, pip-tools 포함, 이미지에는 들어가지 않음)
