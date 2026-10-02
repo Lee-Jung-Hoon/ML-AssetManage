@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}{{ l.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ l.name }}</h1>
+  <div class="actions">
+    {% if can_write %}
+    {{ m.verify_form("/licenses/%d/verify" % l.id, csrf_token) }}
+    <a class="button" href="/licenses/{{ l.id }}/edit">수정</a>
+    <a class="button secondary" href="/licenses/{{ l.id }}/delete">삭제</a>
+    {% endif %}
+    <a class="button secondary" href="/licenses">목록</a>
+  </div>
+</div>
+
+<section class="section">
+  <h2>기본 정보</h2>
+  <dl class="detail-grid">
+    <dt>종류 / 상태</dt><dd>{{ l.license_type }} {{ m.license_badge(info.status) }} {{ m.policy_badge(info.policy_risk) }}</dd>
+    <dt>공급사</dt><dd>{{ l.vendor }}</dd>
+    <dt>시작일 / 만료일</dt><dd>{{ l.start_date or "-" }} ~ {{ "만료 없음" if l.no_expiry else l.expires_at }}
+        <span class="muted">(알림 기준 {{ l.alert_days }}일{% if l.auto_renew %} · 자동 갱신{% endif %})</span></dd>
+    <dt>수량 / 비용</dt><dd>{% if l.quantity is not none %}{{ l.quantity }}{% endif %}
+        {% if l.cost is not none %} · {{ "{:,.2f}".format(l.cost) }} {{ l.currency }}{% if l.billing_cycle %} / {{ l.billing_cycle }}{% endif %}{% endif %}</dd>
+    <dt>담당자</dt><dd>{{ m.owner_cell(l.owner_name, l.owner_active) }}</dd>
+    <dt>태그</dt><dd>{{ m.tag_list(tags) }}</dd>
+    <dt>최신성</dt><dd>{{ m.verify_badge(l.last_verified_at) }}{% if l.verified_by_name %} <span class="muted">({{ l.verified_by_name }}, {{ l.last_verified_at | kst }})</span>{% endif %}</dd>
+    <dt>비고</dt><dd class="pre">{{ l.notes }}</dd>
+    <dt>생성</dt><dd>{{ l.created_at | kst }} · {{ l.created_by_name }}</dd>
+    <dt>수정</dt><dd>{{ l.updated_at | kst }} · {{ l.updated_by_name }}</dd>
+  </dl>
+</section>
+
+{% if l.license_type == "SSL/TLS 인증서" %}
+<section class="section" id="ssl">
+  <h2>SSL/TLS 정보</h2>
+  <dl class="detail-grid">
+    <dt>CN</dt><dd>{{ l.ssl_cn or "" }}{% if l.ssl_wildcard %} {{ m.badge("와일드카드", "gray") }}{% endif %}</dd>
+    <dt>SAN</dt><dd>{% for san in san_lines %}<div>{{ san }}</div>{% endfor %}</dd>
+    <dt>발급 CA</dt><dd>{{ l.ssl_ca or "" }}</dd>
+    <dt>키 알고리즘</dt><dd>{{ l.ssl_key_algo or "" }}</dd>
+    <dt>일련번호</dt><dd>{{ l.ssl_serial or "" }}</dd>
+    <dt>SHA-256 지문</dt><dd class="nowrap">{{ l.ssl_sha256 or "" }}</dd>
+  </dl>
+</section>
+{% endif %}
+
+{% if l.license_type == "AI API" %}
+<section class="section" id="ai">
+  <h2>AI API 정보</h2>
+  <dl class="detail-grid">
+    <dt>제공사</dt><dd>{{ l.ai_provider }}</dd>
+    <dt>사용 모델</dt><dd>{% for mdl in model_lines %}<div>{{ mdl }}</div>{% endfor %}</dd>
+    <dt>월 예산</dt><dd>{% if l.ai_monthly_budget is not none %}{{ "{:,.2f}".format(l.ai_monthly_budget) }} {{ l.currency }}{% endif %}</dd>
+    <dt>사용 한도 설정</dt><dd>{{ "설정됨" if l.ai_usage_limit_set else "설정 안 됨" }}</dd>
+    <dt>키 보관 위치</dt><dd>{{ l.ai_key_location or "" }} <span class="muted">(API 키 자체는 저장하지 않습니다)</span></dd>
+    <dt>고객 데이터 전송</dt><dd>{{ l.ai_sends_customer_data }}</dd>
+    <dt>학습 활용 거부(opt-out)</dt><dd>{{ l.ai_training_opt_out }} {{ m.policy_badge(info.policy_risk) }}</dd>
+    <dt>데이터 보존 정책</dt><dd class="pre">{{ l.ai_retention_note or "" }}</dd>
+  </dl>
+</section>
+{% else %}
+<section class="section" id="sensitive">
+  <h2>민감 정보</h2>
+  <dl class="detail-grid">
+  {% for item in sensitive %}
+    <dt>{{ item.label }}</dt>
+    <dd>{% if item.error %}<span class="muted">복호화 실패</span>
+        {% elif item.masked %}<code>{{ item.masked }}</code>
+          {% if can_write %}
+          <form method="post" action="/licenses/{{ l.id }}/reveal" class="inline-form">
+            {{ m.csrf_input(csrf_token) }}<input type="hidden" name="field" value="{{ item.field }}">
+            <button type="submit" class="secondary">원문 보기 (열람 기록됨)</button>
+          </form>
+          {% endif %}
+        {% else %}<span class="muted">저장된 값 없음</span>{% endif %}</dd>
+  {% endfor %}
+  </dl>
+</section>
+{% endif %}
+
+{% if l.license_type == "AI API" %}
+<section class="section" id="models">
+  <h2>연결된 AI 모델 ({{ models | length }})</h2>
+  {% if models %}
+  <table>
+    <thead><tr><th>모델</th><th>버전</th><th>상태</th><th>상업 이용</th></tr></thead>
+    <tbody>{% for mdl in models %}
+      <tr><td><a href="/models/{{ mdl.id }}">{{ mdl.name }}</a></td><td>{{ mdl.version }}</td><td>{{ mdl.status }}</td><td>{{ mdl.commercial_use }}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+  {% else %}<p class="muted">이 API를 사용하는 AI 모델이 없습니다.</p>{% endif %}
+</section>
+{% endif %}
+
+<section class="section" id="servers">
+  <div class="page-head"><h2>연결된 서버 ({{ servers | length }})</h2>
+    {% if can_write %}<a class="button secondary" href="/licenses/{{ l.id }}/servers/new">서버 연결</a>{% endif %}</div>
+  {% if servers %}
+  <table>
+    <thead><tr><th>서버</th><th>호스트명</th><th>환경</th><th>상태</th>{% if can_write %}<th></th>{% endif %}</tr></thead>
+    <tbody>{% for sv in servers %}
+      <tr><td><a href="/servers/{{ sv.id }}">{{ sv.name }}</a></td><td>{{ sv.hostname }}</td><td>{{ m.badge(sv.environment, "gray") }}</td><td>{{ sv.status }}</td>
+        {% if can_write %}<td><form method="post" action="/licenses/{{ l.id }}/servers/{{ sv.id }}/delete" class="inline-form">{{ m.csrf_input(csrf_token) }}<button type="submit" class="secondary">연결 해제</button></form></td>{% endif %}</tr>
+    {% endfor %}</tbody>
+  </table>
+  {% else %}<p class="muted">연결된 서버가 없습니다.</p>{% endif %}
+</section>
+
+<section class="section" id="services">
+  <div class="page-head"><h2>연결된 서비스 ({{ services | length }})</h2>
+    {% if can_write %}<a class="button secondary" href="/licenses/{{ l.id }}/services/new">서비스 연결</a>{% endif %}</div>
+  {% if services %}
+  <table>
+    <thead><tr><th>서비스</th><th>중요도</th><th>상태</th>{% if can_write %}<th></th>{% endif %}</tr></thead>
+    <tbody>{% for sv in services %}
+      <tr><td><a href="/services/{{ sv.id }}">{{ sv.name }}</a> <span class="muted">({{ sv.code }})</span></td><td>{{ m.tier_badge(sv.tier) }}</td><td>{{ sv.status }}</td>
+        {% if can_write %}<td><form method="post" action="/licenses/{{ l.id }}/services/{{ sv.id }}/delete" class="inline-form">{{ m.csrf_input(csrf_token) }}<button type="submit" class="secondary">연결 해제</button></form></td>{% endif %}</tr>
+    {% endfor %}</tbody>
+  </table>
+  {% else %}<p class="muted">연결된 서비스가 없습니다.</p>{% endif %}
+</section>
+
+{{ m.notes_section(notes, "/licenses/%d" % l.id, can_write, user, csrf_token, today) }}
+{{ m.history_section(history) }}
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ label }} 원문{% endblock %}
+{% block content %}
+<h1>{{ label }} 원문</h1>
+<p><strong>{{ l.name }}</strong>의 {{ label }}입니다. 이 열람은 감사 로그에 기록되었습니다 (값은 기록되지 않음).</p>
+<div class="secret-box" role="alert">
+  <code>{{ plain }}</code>
+</div>
+<p class="muted">이 화면을 벗어나면 다시 열람 요청이 필요합니다. 화면을 공유하거나 캡처하지 않도록 주의하세요.</p>
+<a class="button" href="/licenses/{{ l.id }}">상세로 돌아가기</a>
+{% endblock %}

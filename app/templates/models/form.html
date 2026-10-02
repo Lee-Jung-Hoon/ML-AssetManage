@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}{{ "AI 모델 수정" if target else "AI 모델 등록" }}{% endblock %}
+{% block content %}
+<h1>{{ "AI 모델 수정" if target else "AI 모델 등록" }}</h1>
+{% if errors %}<div class="flash flash-error" role="alert">입력값을 확인하세요.</div>{% endif %}
+<p class="muted">모델 파일, 가중치, 학습 메트릭은 저장하지 않습니다. 저장 위치와 링크만 기록하세요.</p>
+<form class="form-wide" method="post" action="{{ '/models/%d/edit' % target.id if target else '/models/new' }}">
+  {{ m.csrf_input(csrf_token) }}
+  {{ m.field_error(errors, "__all__") }}
+  <div class="form-grid">
+    {{ m.text_field("name", "모델명", values, errors, required=True, maxlength=100) }}
+    {{ m.text_field("version", "버전", values, errors, required=True, maxlength=50) }}
+    {{ m.select_field("model_type", "모델 유형", type_options, values, errors, required=True) }}
+    {{ m.select_field("source", "출처", source_options, values, errors, required=True) }}
+    {{ m.text_field("base_model", "베이스 모델 (파인튜닝/오픈소스는 필수, 예: Llama 3.1 8B Instruct)", values, errors, maxlength=200) }}
+    {{ m.select_field("status", "상태", status_options, values, errors, required=True) }}
+    <div class="field{% if errors.get('model_license') %} has-error{% endif %}">
+      <label for="f-model_license">모델 라이선스 (목록에서 고르거나 직접 입력)</label>
+      <input id="f-model_license" name="model_license" list="license-list" maxlength="100" value="{{ values.get('model_license', '') }}">
+      <datalist id="license-list">{% for l in license_choices %}<option value="{{ l }}">{% endfor %}</datalist>
+      {{ m.field_error(errors, "model_license") }}
+    </div>
+    {{ m.select_field("commercial_use", "상업 이용", commercial_options, values, errors, required=True) }}
+    <div class="span2">{{ m.textarea_field("license_note", "라이선스 조건 메모 (예: 월간 활성 사용자 기준 초과 시 별도 계약 필요)", values, errors, rows=3, maxlength=2000) }}</div>
+    <div class="span2">{{ m.textarea_field("description", "용도 설명", values, errors, rows=4, maxlength=4000, required=True) }}</div>
+    {{ m.text_field("param_size", "파라미터 수 (예: 8B)", values, errors, maxlength=30) }}
+    {{ m.text_field("vram_gb", "서빙 시 필요 VRAM (GB)", values, errors, type="number") }}
+    <div class="span2">{{ m.text_field("storage_location", "저장 위치 (모델 레지스트리, 오브젝트 스토리지 경로 등; 링크가 아닌 텍스트로 표시됩니다)", values, errors, maxlength=500) }}</div>
+    {{ m.text_field("experiment_url", "실험/학습 기록 URL (MLflow, W&B 등, http/https)", values, errors, maxlength=500) }}
+    {{ m.text_field("card_url", "모델 카드/문서 URL (http/https)", values, errors, maxlength=500) }}
+    {{ m.select_field("license_id", "상용 API 연결 (출처가 '상용 API'일 때만, 종류가 AI API인 라이선스)", api_license_options, values, errors, blank="연결 안 함") }}
+    {{ m.owner_select("owner_id", "담당자", owner_opts, values, errors) }}
+    <div class="span2">{{ m.tags_field(values, errors) }}</div>
+  </div>
+  <p class="muted">사용하는 서비스는 저장 후 상세 화면에서 연결합니다. 수정은 '내용 확인 완료'로 간주되지 않습니다.</p>
+  <div class="actions">
+    <button type="submit">저장</button>
+    <a class="button secondary" href="{{ '/models/%d' % target.id if target else '/models' }}">취소</a>
+  </div>
+</form>
+{% endblock %}

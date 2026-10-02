@@ -1,0 +1,244 @@
+{# 공통 매크로. 자동 이스케이프에 의존한다 (이스케이프 우회 금지). #}
+
+{% macro csrf_input(token) -%}
+<input type="hidden" name="csrf_token" value="{{ token }}">
+{%- endmacro %}
+
+{% macro field_error(errors, name) -%}
+{% if errors and errors.get(name) %}<span class="field-error" role="alert">{{ errors[name] }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro text_field(name, label, values, errors, type="text", required=False, maxlength=None, autocomplete=None) -%}
+<div class="field{% if errors and errors.get(name) %} has-error{% endif %}">
+  <label for="f-{{ name }}">{{ label }}{% if required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+  <input id="f-{{ name }}" name="{{ name }}" type="{{ type }}"
+         {% if type != "password" %}value="{{ values.get(name, '') if values else '' }}"{% endif %}
+         {% if required %}required{% endif %}
+         {% if maxlength %}maxlength="{{ maxlength }}"{% endif %}
+         {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}>
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}
+
+{% macro badge(text, kind="gray") -%}
+<span class="badge badge-{{ kind }}">{{ text }}</span>
+{%- endmacro %}
+
+{% macro select_field(name, label, options, values, errors, required=False, blank=None) -%}
+<div class="field{% if errors and errors.get(name) %} has-error{% endif %}">
+  <label for="f-{{ name }}">{{ label }}{% if required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+  <select id="f-{{ name }}" name="{{ name }}"{% if required %} required{% endif %}>
+    {% if blank is not none %}<option value="">{{ blank }}</option>{% endif %}
+    {% for value, text in options %}
+    <option value="{{ value }}"{% if values and values.get(name) == value %} selected{% endif %}>{{ text }}</option>
+    {% endfor %}
+  </select>
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}
+
+{% macro checkbox_field(name, label, checked) -%}
+<div class="field field-check">
+  <label><input type="checkbox" name="{{ name }}" value="on"{% if checked %} checked{% endif %}> {{ label }}</label>
+</div>
+{%- endmacro %}
+
+{# 페이지네이션: query는 page를 제외한 현재 필터 dict #}
+{% macro pagination(page, pages, path, query) -%}
+{% if pages > 1 %}
+<nav class="pagination" aria-label="페이지 이동">
+  {% if page > 1 %}<a href="{{ path }}?{{ (query | urlencode) }}{{ '&' if query }}page={{ page - 1 }}">이전</a>{% endif %}
+  <span>{{ page }} / {{ pages }}</span>
+  {% if page < pages %}<a href="{{ path }}?{{ (query | urlencode) }}{{ '&' if query }}page={{ page + 1 }}">다음</a>{% endif %}
+</nav>
+{% endif %}
+{%- endmacro %}
+
+
+{% macro textarea_field(name, label, values, errors, rows=4, maxlength=None, required=False) -%}
+<div class="field{% if errors and errors.get(name) %} has-error{% endif %}">
+  <label for="f-{{ name }}">{{ label }}{% if required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+  <textarea id="f-{{ name }}" name="{{ name }}" rows="{{ rows }}"{% if maxlength %} maxlength="{{ maxlength }}"{% endif %}{% if required %} required{% endif %}>{{ values.get(name, '') if values else '' }}</textarea>
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}
+
+{# 담당자 선택: options는 assets.owner_options() 결과 (활성 사용자만) #}
+{% macro owner_select(name, label, options, values, errors) -%}
+{{ select_field(name, label, options, values, errors, blank="담당자 없음") }}
+{%- endmacro %}
+
+{% macro tags_field(values, errors) -%}
+{{ text_field("tags", "태그 (쉼표로 구분)", values, errors, maxlength=400) }}
+{%- endmacro %}
+
+{% macro tag_list(tags) -%}
+{% for t in tags %}<span class="tag">{{ t }}</span>{% endfor %}
+{%- endmacro %}
+
+{# 최신성 배지: state는 verify_state(last_verified_at) #}
+{% macro verify_badge(last_verified_at) -%}
+{% set v = verify_state(last_verified_at) -%}
+{% if v.stale %}{{ badge("확인 필요", "orange") }}{% else %}{{ badge("확인됨 " ~ v.date, "green") }}{% endif %}
+{%- endmacro %}
+
+{% macro owner_cell(name, active) -%}
+{% if name %}{{ name }}{% if not active %} {{ badge("비활성 담당자", "orange") }}{% endif %}{% else %}<span class="muted">없음</span>{% endif %}
+{%- endmacro %}
+
+{% macro usage_bar(percent) -%}
+{% if percent is none %}<span class="muted">-</span>{% else %}
+<span class="bar" aria-hidden="true"><span class="bar-fill bar-{{ usage_level(percent) }} {{ usage_class(percent) }}"></span></span>
+{{ badge("%.0f%%" | format(percent), usage_level(percent)) }}
+{% endif %}
+{%- endmacro %}
+
+{# "내용 확인 완료" 버튼 (editor 이상) #}
+{% macro verify_form(action, token) -%}
+<form method="post" action="{{ action }}">
+  {{ csrf_input(token) }}
+  <button type="submit" class="secondary">내용 확인 완료</button>
+</form>
+{%- endmacro %}
+
+{# 운영 메모 타임라인. base: 자산 상세 URL (예: /servers/3) #}
+{% macro notes_section(notes, base, can_write, user, token, today) -%}
+<section class="section" id="notes">
+  <h2>운영 메모</h2>
+  {% if can_write %}
+  <form method="post" action="{{ base }}/notes" class="form-wide">
+    {{ csrf_input(token) }}
+    <div class="form-grid">
+      <div class="field"><label for="note_date">작업 날짜</label>
+        <input id="note_date" type="date" name="note_date" value="{{ today }}"></div>
+      <div class="field span2"><label for="note_content">내용 (최대 2000자)</label>
+        <textarea id="note_content" name="content" rows="3" maxlength="2000" required></textarea></div>
+    </div>
+    <button type="submit">메모 추가</button>
+  </form>
+  {% endif %}
+  {% for n in notes %}
+  <div class="note">
+    <div class="note-meta">
+      <strong>{{ n.note_date }}</strong><span>{{ n.author_name }}</span><span>{{ n.created_at | kst }}</span>
+      {% if can_write and (n.author_id == user.id or user.role == "admin") %}
+      <form method="post" action="{{ base }}/notes/{{ n.id }}/delete">
+        {{ csrf_input(token) }}<button type="submit" class="secondary">삭제</button>
+      </form>
+      {% endif %}
+    </div>
+    <div class="pre">{{ n.content }}</div>
+  </div>
+  {% else %}
+  <p class="muted">작성된 메모가 없습니다.</p>
+  {% endfor %}
+</section>
+{%- endmacro %}
+
+{% macro history_section(history) -%}
+<section class="section" id="history">
+  <h2>변경 이력</h2>
+  <table>
+    <thead><tr><th>시각</th><th>사용자</th><th>행위</th><th>변경 요약</th></tr></thead>
+    <tbody>
+    {% for h in history %}
+      <tr><td class="nowrap">{{ h.at | kst(True) }}</td><td>{{ h.username }}</td><td>{{ h.action }}</td><td class="pre">{{ h.summary }}</td></tr>
+    {% else %}
+      <tr><td colspan="4" class="muted">기록이 없습니다.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{%- endmacro %}
+
+{# 선언형 폼 필드 (서버 하위 항목 등). f는 FormField 정의 #}
+{% macro generic_field(f, values, errors) -%}
+{% if f.kind == "checkbox" %}
+  {{ checkbox_field(f.name, f.label, values.get(f.name)) }}{{ field_error(errors, f.name) }}
+{% elif f.kind == "select" %}
+  {{ select_field(f.name, f.label, f.options | map("tuple_pair") | list, values, errors, required=f.required, blank=None if f.required else "선택 안 함") }}
+{% elif f.kind == "textarea" %}
+  {{ textarea_field(f.name, f.label, values, errors, rows=3, maxlength=f.maxlength, required=f.required) }}
+{% else %}
+<div class="field{% if errors and errors.get(f.name) %} has-error{% endif %}">
+  <label for="f-{{ f.name }}">{{ f.label }}{% if f.required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+  <input id="f-{{ f.name }}" name="{{ f.name }}" type="{{ f.kind }}" value="{{ values.get(f.name, '') }}"
+         {% if f.kind == "number" %}step="any"{% endif %}
+         {% if f.required %}required{% endif %}
+         {% if f.maxlength %}maxlength="{{ f.maxlength }}"{% endif %}
+         {% if f.datalist %}list="dl-{{ f.name }}"{% endif %}>
+  {% if f.datalist %}<datalist id="dl-{{ f.name }}">{% for o in f.datalist %}<option value="{{ o }}">{% endfor %}</datalist>{% endif %}
+  {{ field_error(errors, f.name) }}
+</div>
+{% endif %}
+{%- endmacro %}
+
+{# 표의 한 칸: cell은 {text, badge, usage, muted} #}
+{% macro item_cell(c) -%}
+{% if c.usage is not none %}{{ usage_bar(c.usage) }}
+{% elif c.badge %}{{ badge(c.text, c.badge) }}
+{% elif c.muted %}<span class="muted">{{ c.text }}</span>
+{% else %}{{ c.text }}{% endif %}
+{%- endmacro %}
+
+{# 접속 URL/도메인 목록 (줄바꿈 구분). http(s)만 링크로 만들고 나머지는 텍스트로 표시한다. #}
+{% macro url_list(text) -%}
+{% for line in text.splitlines() %}
+  <div>{% if line.startswith("http://") or line.startswith("https://") %}<a href="{{ line }}" rel="noopener noreferrer" target="_blank">{{ line }}</a>{% else %}{{ line }}{% endif %}</div>
+{% endfor %}
+{%- endmacro %}
+
+{% macro url_link(url) -%}
+{% if url.startswith("http://") or url.startswith("https://") %}<a href="{{ url }}" rel="noopener noreferrer" target="_blank">{{ url }}</a>{% else %}{{ url }}{% endif %}
+{%- endmacro %}
+
+{% macro tier_badge(tier) -%}
+{{ badge("Tier " ~ tier, {1: "red", 2: "orange", 3: "gray"}[tier]) }}
+{%- endmacro %}
+
+{# 라이선스 만료 상태 배지: info는 assets.license_status() 결과 (만료=빨강, 임박=주황, 유효=초록, 영구=회색) #}
+{% macro license_badge(info) -%}
+{{ badge(info.state ~ ((" D-" ~ info.days) if info.days is not none and info.days >= 0 else (" D+" ~ (-info.days)) if info.days is not none else ""), info.badge) }}
+{%- endmacro %}
+
+{% macro policy_badge(risk) -%}
+{% if risk %}{{ badge("데이터 정책 확인", "red") }}{% endif %}
+{%- endmacro %}
+
+{# AI 모델 상업 이용 / 라이선스 위험 배지 (위험=빨강, 조건 확인=주황) #}
+{% macro commercial_badge(value) -%}
+{{ badge("상업 이용 " ~ value, {"가능": "green", "조건부": "orange", "불가": "red", "미확인": "orange"}[value]) }}
+{%- endmacro %}
+
+{% macro risk_badge(risk) -%}
+{% if risk == "risk" %}{{ badge("라이선스 위험", "red") }}{% elif risk == "conditional" %}{{ badge("조건 확인", "orange") }}{% endif %}
+{%- endmacro %}
+
+{# CSV 내보내기 버튼 (editor 이상). 현재 적용된 필터를 쿼리스트링으로 그대로 전달한다 (POST + CSRF). #}
+{% macro export_form(path, query, token) -%}
+<form method="post" action="{{ path }}{% if query %}?{{ query | urlencode }}{% endif %}" class="inline-form">
+  {{ csrf_input(token) }}
+  <button type="submit" class="secondary">CSV 내보내기</button>
+</form>
+{%- endmacro %}
+
+{# 건수 표 + CSS 막대 (items: [{label, count, pct}]) #}
+{% macro count_table(items, kind="gray") -%}
+{% if items %}
+<table class="compact">
+  <tbody>
+  {% for i in items %}
+    <tr><td>{{ i.label }}</td><td class="num">{{ i.count }}</td>
+        <td><span class="bar" aria-hidden="true"><span class="bar-fill bar-{{ kind }} {{ usage_class(i.pct) }}"></span></span></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="muted">데이터가 없습니다.</p>{% endif %}
+{%- endmacro %}
+
+{% macro stat_card(label, value, href=None, level=None) -%}
+<div class="card{% if level %} card-{{ level }}{% endif %}">
+  <div class="card-num">{{ value }}</div>
+  <div class="card-label">{% if href %}<a href="{{ href }}">{{ label }}</a>{% else %}{{ label }}{% endif %}</div>
+</div>
+{%- endmacro %}

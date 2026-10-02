@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}오류 {{ status_code }}{% endblock %}
+{% block content %}
+<section class="error-page">
+  <h1>{{ status_code }}</h1>
+  <p>{{ message }}</p>
+  <p><a href="/">처음으로 이동</a></p>
+</section>
+{% endblock %}

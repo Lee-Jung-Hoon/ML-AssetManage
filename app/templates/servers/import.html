@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}서버 CSV 일괄 등록{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>서버 CSV 일괄 등록</h1>
+  <a class="button secondary" href="/servers">서버 목록</a>
+</div>
+<p>서버 <strong>기본 정보만</strong> 신규 등록합니다 (디스크·GPU·ACL 등 하위 항목은 등록 후 서버 상세에서 입력, 기존 서버 업데이트는 지원하지 않음). 한 번에 최대 {{ max_rows }}행, 먼저 <strong>검증(미리보기)</strong> 후 <strong>등록 확정</strong>을 누르면 서버가 전체를 다시 검증해 하나라도 오류가 있으면 아무것도 등록하지 않습니다.</p>
+
+<section class="section">
+  <h2>형식</h2>
+  <p>첫 줄은 아래 헤더 그대로여야 합니다. <code>tags</code>는 <code>;</code>로 구분하고, <code>owner_username</code>은 활성 사용자의 사용자명이어야 합니다.</p>
+  <pre class="pre code-block">{{ header }}
+{% for e in examples %}{{ e }}
+{% endfor %}</pre>
+</section>
+
+<form method="post" action="/servers/import/preview" class="form-wide">
+  {{ m.csrf_input(csrf_token) }}
+  <div class="field{% if analysis and analysis.error %} has-error{% endif %}">
+    <label for="f-csv">CSV (붙여 넣기)</label>
+    <textarea id="f-csv" name="csv" rows="12" spellcheck="false">{{ csv_text }}</textarea>
+    {% if analysis and analysis.error %}<span class="field-error" role="alert">{{ analysis.error }}</span>{% endif %}
+  </div>
+  <button type="submit">검증 (미리보기)</button>
+</form>
+
+{% if analysis and analysis.rows %}
+<section class="section" id="preview">
+  <h2>검증 결과 — 전체 {{ analysis.rows | length }}행, 오류 {{ analysis.error_rows }}행</h2>
+  {% if analysis.ok %}
+  <div class="flash flash-success" role="status">모든 행이 유효합니다. 아래 '등록 확정'을 누르면 서버가 다시 검증한 뒤 한 번에 등록합니다.</div>
+  {% else %}
+  <div class="flash flash-error" role="alert">오류가 있는 행이 있어 등록할 수 없습니다. 오류를 고쳐 다시 검증하세요. (아무것도 저장되지 않았습니다.)</div>
+  {% endif %}
+  <table>
+    <thead><tr><th>행</th><th>서버명</th><th>호스트명</th><th>대표 IP</th><th>담당자</th><th>결과</th></tr></thead>
+    <tbody>
+    {% for r in analysis.rows %}
+      <tr>
+        <td>{{ r.number }}</td><td>{{ r.name }}</td><td>{{ r.hostname }}</td><td>{{ r.primary_ip }}</td><td>{{ r.owner_username }}</td>
+        <td>{% if r.errors %}{{ m.badge("오류", "red") }}<ul>{% for e in r.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% else %}{{ m.badge("성공", "green") }}{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if analysis.ok %}
+  <form method="post" action="/servers/import/commit">
+    {{ m.csrf_input(csrf_token) }}
+    <textarea name="csv" hidden>
+{{ csv_text }}</textarea>
+    <button type="submit">등록 확정 ({{ analysis.rows | length }}건)</button>
+  </form>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

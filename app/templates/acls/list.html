@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}ACL 전체 목록{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>ACL 전체 목록</h1>
+  <div class="actions">
+    {% if user.role in ("editor", "admin") %}{{ m.export_form("/acls/export", query, csrf_token) }}{% endif %}
+    <a class="button secondary" href="/servers">서버 목록</a>
+  </div>
+</div>
+{% if errors %}<div class="flash flash-error" role="alert">조회 조건이 올바르지 않습니다. 표시된 항목을 확인하세요.</div>{% endif %}
+<form class="filters" method="get" action="/acls">
+  {{ m.text_field("q", "검색 (서버·CIDR·목적·티켓·요청자)", values, errors, maxlength=100) }}
+  {{ m.select_field("status", "상태", status_options, values, errors, blank="전체") }}
+  {{ m.select_field("direction", "방향", direction_options, values, errors, blank="전체") }}
+  <button type="submit">조회</button>
+  <a class="button secondary" href="/acls">초기화</a>
+</form>
+<p class="muted">총 {{ total }}건 · 서버별 ACL은 각 서버 상세에서 추가/수정합니다.</p>
+<table>
+  <thead><tr><th>서버</th><th>방향</th><th>출발지</th><th>목적지</th><th>포트</th><th>목적/사유</th><th>요청자</th><th>요청일</th><th>티켓</th><th>상태</th><th>만료일</th></tr></thead>
+  <tbody>
+  {% for a in rows %}
+    <tr>
+      <td><a href="/servers/{{ a.server_id }}#acls">{{ a.server_name }}</a></td><td>{{ a.direction }}</td><td>{{ a.src_cidr }}</td><td>{{ a.dst_cidr }}</td>
+      <td>{{ port_text(a) }}/{{ a.protocol }}</td><td>{{ a.purpose }}</td><td>{{ a.requester }}</td><td>{{ a.requested_at }}</td><td>{{ a.ticket_no }}</td>
+      <td>{{ m.badge(a.status, {"요청": "orange", "승인": "orange", "적용완료": "green", "반려": "gray", "회수": "gray"}[a.status]) }}</td>
+      <td>{{ a.expires_at or "" }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="11" class="muted">조건에 맞는 ACL이 없습니다.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{{ m.pagination(page, pages, "/acls", query) }}
+{% endblock %}

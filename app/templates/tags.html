@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}태그 관리{% endblock %}
+{% block content %}
+<h1>태그 관리</h1>
+<p class="muted">태그는 각 자산의 등록/수정 화면에서 쉼표로 구분해 입력하면 자동 생성됩니다. 이름 변경은 같은 이름이 이미 있으면 거부되며(병합 없음), 삭제는 사용되지 않는 태그만 가능합니다.</p>
+<table>
+  <thead><tr><th>태그</th><th>사용 수</th><th>서버</th><th>서비스</th><th>AI 모델</th><th>라이선스</th><th>이름 변경</th><th></th></tr></thead>
+  <tbody>
+  {% for t in tags %}
+    <tr>
+      <td>{{ m.tag_list([t.name]) }}</td>
+      <td><strong>{{ t.total }}</strong></td><td>{{ t.servers }}</td><td>{{ t.services }}</td><td>{{ t.models }}</td><td>{{ t.licenses }}</td>
+      <td>
+        <form method="post" action="/tags/{{ t.id }}/rename" class="inline-form">
+          {{ m.csrf_input(csrf_token) }}
+          <label class="sr-only" for="rename-{{ t.id }}">새 이름</label>
+          <input id="rename-{{ t.id }}" name="name" value="{{ t.name }}" maxlength="60" required>
+          <button type="submit" class="secondary">변경</button>
+        </form>
+      </td>
+      <td>
+        {% if t.total == 0 %}
+        <form method="post" action="/tags/{{ t.id }}/delete" class="inline-form">
+          {{ m.csrf_input(csrf_token) }}<button type="submit" class="danger">삭제</button>
+        </form>
+        {% else %}<span class="muted">사용 중</span>{% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="8" class="muted">등록된 태그가 없습니다.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %} · 자산 관리</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{% if user %}
+<header class="topbar">
+  <a class="brand" href="/">자산 관리</a>
+  <form class="search" method="get" action="/search">
+    <input type="search" name="q" minlength="2" maxlength="100" placeholder="통합 검색 (서버·서비스·모델·라이선스·IP)" aria-label="통합 검색">
+    <button type="submit">검색</button>
+  </form>
+  <div class="userbox">
+    <span>{{ user.display_name }}</span>
+    <form method="post" action="/logout">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">로그아웃</button>
+    </form>
+  </div>
+</header>
+{% endif %}
+<div class="layout">
+  {% if user %}
+  <nav class="sidebar" aria-label="주 메뉴">
+    <a href="/">대시보드</a>
+    <a href="/servers">서버</a>
+    <a href="/services">서비스</a>
+    <a href="/models">AI 모델</a>
+    <a href="/licenses">라이선스</a>
+    {% if user.role in ("editor", "admin") %}<a href="/tags">태그 관리</a>{% endif %}
+    {% if user.role == "admin" and admin_enabled %}
+    <a href="/users">사용자 관리</a>
+    <a href="/audit">감사 로그</a>
+    <a href="/backup">백업</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+  <main class="content{% if not user %} narrow{% endif %}">
+    {% for f in flashes %}<div class="flash flash-{{ f.level }}" role="status">{{ f.message }}</div>{% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>

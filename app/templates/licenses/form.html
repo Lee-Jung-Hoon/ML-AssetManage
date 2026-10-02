@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}{{ "라이선스 수정" if target else "라이선스 등록" }}{% endblock %}
+{% block content %}
+<h1>{{ "라이선스 수정" if target else "라이선스 등록" }}</h1>
+{% if errors %}<div class="flash flash-error" role="alert">입력값을 확인하세요.</div>{% endif %}
+<form class="form-wide" method="post" action="{{ '/licenses/%d/edit' % target.id if target else '/licenses/new' }}" autocomplete="off">
+  {{ m.csrf_input(csrf_token) }}
+  {{ m.field_error(errors, "__all__") }}
+  <h2>기본 정보</h2>
+  <div class="form-grid">
+    {{ m.text_field("name", "이름", values, errors, required=True, maxlength=200) }}
+    {{ m.select_field("license_type", "종류", type_options, values, errors, required=True) }}
+    {{ m.text_field("vendor", "공급사 / 발급기관", values, errors, maxlength=100) }}
+    {{ m.owner_select("owner_id", "담당자", owner_opts, values, errors) }}
+    {{ m.text_field("start_date", "시작일", values, errors, type="date") }}
+    {{ m.text_field("expires_at", "만료일 (영구 라이선스가 아니면 필수)", values, errors, type="date") }}
+    {{ m.checkbox_field("no_expiry", "만료 없음 (영구 라이선스)", values.get("no_expiry")) }}
+    {{ m.checkbox_field("auto_renew", "자동 갱신", values.get("auto_renew")) }}
+    {{ m.text_field("quantity", "수량 / 좌석 수", values, errors, type="number") }}
+    {{ m.text_field("cost", "비용", values, errors, type="number") }}
+    <div class="field{% if errors.get('currency') %} has-error{% endif %}">
+      <label for="f-currency">통화</label>
+      <input id="f-currency" name="currency" list="currency-list" maxlength="3" value="{{ values.get('currency', 'KRW') }}">
+      <datalist id="currency-list">{% for c in currencies %}<option value="{{ c }}">{% endfor %}</datalist>
+      {{ m.field_error(errors, "currency") }}
+    </div>
+    {{ m.select_field("billing_cycle", "결제 주기", cycle_options, values, errors, blank="선택 안 함") }}
+    {{ m.text_field("alert_days", "갱신 알림 기준일 (만료 며칠 전부터 '임박')", values, errors, type="number", required=True) }}
+    <div class="span2">{{ m.tags_field(values, errors) }}</div>
+    <div class="span2">{{ m.textarea_field("notes", "비고", values, errors, maxlength=4000) }}</div>
+  </div>
+
+  <h2>SSL/TLS 인증서 전용 <small class="muted">(종류가 'SSL/TLS 인증서'일 때만 저장됩니다)</small></h2>
+  <div class="form-grid">
+    {{ m.text_field("ssl_cn", "CN", values, errors, maxlength=253) }}
+    {{ m.checkbox_field("ssl_wildcard", "와일드카드 인증서", values.get("ssl_wildcard")) }}
+    <div class="span2">{{ m.textarea_field("ssl_san", "SAN 목록 (줄바꿈으로 구분)", values, errors, rows=3) }}</div>
+    {{ m.text_field("ssl_ca", "발급 CA", values, errors, maxlength=200) }}
+    {{ m.select_field("ssl_key_algo", "키 알고리즘", algo_options, values, errors, blank="선택 안 함") }}
+    {{ m.text_field("ssl_serial", "일련번호", values, errors, maxlength=100) }}
+    {{ m.text_field("ssl_sha256", "SHA-256 지문", values, errors, maxlength=100) }}
+  </div>
+  <p class="muted">개인키(private key)와 인증서 파일 자체는 저장하지 않습니다.</p>
+
+  <h2>AI API 전용 <small class="muted">(종류가 'AI API'일 때만 저장됩니다)</small></h2>
+  <div class="form-grid">
+    <div class="field{% if errors.get('ai_provider') %} has-error{% endif %}">
+      <label for="f-ai_provider">제공사 (목록에서 고르거나 직접 입력)</label>
+      <input id="f-ai_provider" name="ai_provider" list="provider-list" maxlength="100" value="{{ values.get('ai_provider', '') }}">
+      <datalist id="provider-list">{% for p in providers %}<option value="{{ p }}">{% endfor %}</datalist>
+      {{ m.field_error(errors, "ai_provider") }}
+    </div>
+    {{ m.text_field("ai_monthly_budget", "월 예산 (위 통화 기준)", values, errors, type="number") }}
+    <div class="span2">{{ m.textarea_field("ai_models", "사용 모델 (줄바꿈으로 구분)", values, errors, rows=3) }}</div>
+    {{ m.checkbox_field("ai_usage_limit_set", "제공사 측 사용 한도 설정됨", values.get("ai_usage_limit_set")) }}
+    {{ m.text_field("ai_key_location", "키 보관 위치 (예: Vault: secret/ai/openai-prod)", values, errors, maxlength=300) }}
+    {{ m.select_field("ai_sends_customer_data", "고객 데이터 전송 여부", sends_options, values, errors, blank="(미확인)") }}
+    {{ m.select_field("ai_training_opt_out", "학습 활용 거부(opt-out) 설정", opt_out_options, values, errors, blank="(미확인)") }}
+    <div class="span2">{{ m.textarea_field("ai_retention_note", "데이터 보존 정책 메모 (예: API 입력 30일 보관 후 삭제)", values, errors, rows=2) }}</div>
+  </div>
+  <p class="muted"><strong>API 키 자체는 저장하지 않습니다.</strong> 키 보관 위치만 기록하세요.</p>
+
+{% if not (target and target.license_type == "AI API") %}
+  <h2>민감 정보 <small class="muted">(AI API 종류에서는 입력할 수 없습니다)</small></h2>
+  <p class="muted">AES-256-GCM으로 암호화해 저장하며 화면에는 마지막 4자리만 표시됩니다. CSV 내보내기, 검색, 변경 이력에는 포함되지 않습니다.</p>
+  <div class="form-grid">
+    <div>
+      {{ m.text_field("license_key", "라이선스 키" ~ (" (비워 두면 기존 값 유지)" if has_key else ""), {}, errors, type="password", maxlength=2000, autocomplete="new-password") }}
+      {% if has_key %}{{ m.checkbox_field("clear_license_key", "저장된 라이선스 키 삭제", false) }}{% endif %}
+    </div>
+    <div>
+      {{ m.text_field("account_info", "계정 정보" ~ (" (비워 두면 기존 값 유지)" if has_account else ""), {}, errors, type="password", maxlength=2000, autocomplete="new-password") }}
+      {% if has_account %}{{ m.checkbox_field("clear_account_info", "저장된 계정 정보 삭제", false) }}{% endif %}
+    </div>
+  </div>
+
+{% endif %}
+  <div class="actions">
+    <button type="submit">저장</button>
+    <a class="button secondary" href="{{ '/licenses/%d' % target.id if target else '/licenses' }}">취소</a>
+  </div>
+</form>
+{% endblock %}

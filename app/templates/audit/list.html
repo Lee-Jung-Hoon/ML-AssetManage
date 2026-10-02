@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}감사 로그{% endblock %}
+{% block content %}
+<h1>감사 로그</h1>
+{% if errors %}<div class="flash flash-error" role="alert">조회 조건이 올바르지 않습니다. 표시된 항목을 확인하세요.</div>{% endif %}
+<form class="filters" method="get" action="/audit">
+  {{ m.text_field("date_from", "시작일", values, errors, type="date") }}
+  {{ m.text_field("date_to", "종료일", values, errors, type="date") }}
+  {{ m.select_field("user", "사용자", user_options, values, errors, blank="전체") }}
+  {{ m.select_field("action", "행위", action_options, values, errors, blank="전체") }}
+  {{ m.select_field("target_type", "대상 종류", type_options, values, errors, blank="전체") }}
+  <button type="submit">조회</button>
+  <a class="button secondary" href="/audit">초기화</a>
+</form>
+<p class="muted">총 {{ total }}건 · 시각은 Asia/Seoul 기준입니다. 감사 로그는 수정·삭제할 수 없습니다.</p>
+<table>
+  <thead><tr><th>시각</th><th>사용자</th><th>IP</th><th>행위</th><th>대상</th><th>변경 요약</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td class="nowrap">{{ r.at | kst(True) }}</td>
+      <td>{{ r.username }}</td>
+      <td>{{ r.ip }}</td>
+      <td>{{ r.action }}</td>
+      <td class="nowrap">{% if r.target_type %}{{ r.target_type }}{% if r.target_id is not none %} #{{ r.target_id }}{% endif %}{% endif %}</td>
+      <td class="pre">{{ r.summary }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="muted">조건에 맞는 기록이 없습니다.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{{ m.pagination(page, pages, "/audit", query) }}
+{% endblock %}
