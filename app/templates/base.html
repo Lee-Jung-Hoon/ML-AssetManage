@@ -18,24 +18,25 @@
     <span>{{ user.display_name }}</span>
     <form method="post" action="/logout">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <button type="submit">로그아웃</button>
+      <button type="submit" class="secondary">로그아웃</button>
     </form>
   </div>
 </header>
 {% endif %}
 <div class="layout">
   {% if user %}
+  {% set path = request.url.path %}
   <nav class="sidebar" aria-label="주 메뉴">
-    <a href="/">대시보드</a>
-    <a href="/servers">서버</a>
-    <a href="/services">서비스</a>
-    <a href="/models">AI 모델</a>
-    <a href="/licenses">라이선스</a>
-    {% if user.role in ("editor", "admin") %}<a href="/tags">태그 관리</a>{% endif %}
+    <a href="/"{% if path == "/" %} aria-current="page"{% endif %}>대시보드</a>
+    <a href="/servers"{% if path.startswith("/servers") %} aria-current="page"{% endif %}>서버</a>
+    <a href="/services"{% if path.startswith("/services") %} aria-current="page"{% endif %}>서비스</a>
+    <a href="/models"{% if path.startswith("/models") %} aria-current="page"{% endif %}>AI 모델</a>
+    <a href="/licenses"{% if path.startswith("/licenses") %} aria-current="page"{% endif %}>라이선스</a>
+    {% if user.role in ("editor", "admin") %}<a href="/tags"{% if path.startswith("/tags") %} aria-current="page"{% endif %}>태그 관리</a>{% endif %}
     {% if user.role == "admin" and admin_enabled %}
-    <a href="/users">사용자 관리</a>
-    <a href="/audit">감사 로그</a>
-    <a href="/backup">백업</a>
+    <a href="/users"{% if path.startswith("/users") %} aria-current="page"{% endif %}>사용자 관리</a>
+    <a href="/audit"{% if path.startswith("/audit") %} aria-current="page"{% endif %}>감사 로그</a>
+    <a href="/backup"{% if path.startswith("/backup") %} aria-current="page"{% endif %}>백업</a>
     {% endif %}
   </nav>
   {% endif %}
