@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}{{ spec.title }} {{ "수정" if item_id else "추가" }}{% endblock %}
+{% block content %}
+<h1>{{ spec.title }} {{ "수정" if item_id else "추가" }}</h1>
+{% if errors %}<div class="flash flash-error" role="alert">입력값을 확인하세요.</div>{% endif %}
+<form class="form-narrow" method="post"
+      action="{{ '/servers/%d/%s/%d/edit' % (server_id, spec.slug, item_id) if item_id else '/servers/%d/%s/new' % (server_id, spec.slug) }}">
+  {{ m.csrf_input(csrf_token) }}
+  {{ m.field_error(errors, "__all__") }}
+  {% for f in spec.fields %}{{ m.generic_field(f, values, errors) }}{% endfor %}
+  <div class="actions">
+    <button type="submit">저장</button>
+    <a class="button secondary" href="/servers/{{ server_id }}#{{ spec.slug }}">취소</a>
+  </div>
+</form>
+{% if item_id %}
+<hr>
+<form method="post" action="/servers/{{ server_id }}/{{ spec.slug }}/{{ item_id }}/delete">
+  {{ m.csrf_input(csrf_token) }}
+  <p>이 {{ spec.title }} 항목을 삭제합니다. 삭제 내용은 변경 이력에 남습니다.</p>
+  <button type="submit" class="danger">삭제</button>
+</form>
+{% endif %}
+{% endblock %}

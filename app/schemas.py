@@ -212,3 +212,175 @@ class ServerFilter(FormModel):
 class NoteForm(FormModel):
     note_date: OptDate = None
     content: str = Field(min_length=1, max_length=2000)
+
+
+# ------------------------------------------------------------------ 서버 하위 항목 (6단계)
+import ipaddress  # noqa: E402
+
+IP_KINDS = ("공인", "사설", "관리용", "VIP")
+DISK_TYPES = ("SSD", "HDD", "NVMe", "SAN", "NAS")
+RUN_TYPES = ("systemd", "Windows 서비스", "프로세스", "기타")
+PROTOCOLS = ("TCP", "UDP")
+GPU_USAGES = ("없음", "전체", "특정 디바이스")
+ACL_DIRECTIONS = ("Inbound", "Outbound")
+ACL_STATUSES = ("요청", "승인", "적용완료", "반려", "회수")
+GPU_MODEL_SUGGESTIONS = ("H200", "H100", "A100 80GB", "A100 40GB", "L40S", "L4", "A10", "T4",
+                         "RTX 6000 Ada", "RTX 4090")
+
+_VERSION = re.compile(r"[0-9]+(\.[0-9]+)*")
+_DEVICES = re.compile(r"[0-9]+(,[0-9]+)*")
+_PORT_MAPPING = re.compile(r"(([0-9]{1,3}\.){3}[0-9]{1,3}:)?([0-9]{1,5})(-[0-9]{1,5})?(:([0-9]{1,5})(-[0-9]{1,5})?)?(/(tcp|udp))?")
+_PORT_SPEC = re.compile(r"([0-9]{1,5})(\s*-\s*([0-9]{1,5}))?")
+
+
+def _ip_address(value: str) -> str:
+    try:
+        if "%" in value:
+            raise ValueError
+        return str(ipaddress.ip_address(value))
+    except ValueError:
+        raise ValueError("올바른 IPv4/IPv6 주소가 아닙니다.") from None
+
+
+def _ip_network(value: str) -> str:
+    """IP 또는 CIDR을 검증하고 정규화한다 (ip_network(strict=False): 호스트 비트는 0으로)."""
+    try:
+        if "%" in value:
+            raise ValueError
+        return str(ipaddress.ip_network(value, strict=False))
+    except ValueError:
+        raise ValueError("올바른 IP 또는 CIDR이 아닙니다 (예: 10.0.0.0/24).") from None
+
+
+def _version(value: str) -> str:
+    if value and not _VERSION.fullmatch(value):
+        raise ValueError("숫자와 점만 사용할 수 있습니다 (예: 550.54.15, 12.4).")
+    return value
+
+
+def _port_spec(value: str) -> str:
+    """단일 포트 또는 범위('8000-8100')를 1~65535로 검증하고 정규화한다."""
+    m = _PORT_SPEC.fullmatch(value)
+    if not m:
+        raise ValueError("포트는 단일 값(80) 또는 범위(8000-8100)로 입력하세요.")
+    start = int(m.group(1))
+    end = int(m.group(3)) if m.group(3) else start
+    if not (1 <= start <= 65535 and 1 <= end <= 65535):
+        raise ValueError("포트는 1~65535 사이여야 합니다.")
+    if start > end:
+        raise ValueError("포트 범위의 시작이 끝보다 클 수 없습니다.")
+    return str(start) if start == end else f"{start}-{end}"
+
+
+def split_port_spec(spec: str) -> tuple[int, int]:
+    start, _, end = spec.partition("-")
+    return int(start), int(end or start)
+
+
+def _port_mappings(value: str) -> str:
+    entries = [e.strip() for e in re.split(r"[,\n]", value) if e.strip()]
+    for entry in entries:
+        m = _PORT_MAPPING.fullmatch(entry)
+        ports = [int(p) for p in re.findall(r"(?<![0-9.])[0-9]{1,5}(?![0-9.])", entry.split("/")[0])] if m else []
+        if not m or any(not 1 <= p <= 65535 for p in ports):
+            raise ValueError("포트 매핑 형식이 올바르지 않습니다 (예: 8080:80, 127.0.0.1:5432:5432/tcp).")
+    return ", ".join(entries)
+
+
+IPAddress = Annotated[str, Field(min_length=1, max_length=45), AfterValidator(_ip_address)]
+Network = Annotated[str, Field(min_length=1, max_length=43), AfterValidator(_ip_network)]
+Version = Annotated[str, Field(max_length=30), AfterValidator(_version)]
+PortSpec = Annotated[str, Field(min_length=1, max_length=11), AfterValidator(_port_spec)]
+Money = Field(allow_inf_nan=False)
+
+
+class ServerIPForm(FormModel):
+    ip: IPAddress
+    interface_name: str = Field(default="", max_length=50)
+    kind: Literal[*IP_KINDS]
+    is_primary: Checkbox = False
+
+
+class ServerDiskForm(FormModel):
+    mount_point: str = Field(min_length=1, max_length=100)
+    device: str = Field(default="", max_length=100)
+    filesystem: str = Field(default="", max_length=30)
+    disk_type: Literal[*DISK_TYPES]
+    total_gb: float = Field(gt=0, le=10_000_000, allow_inf_nan=False)
+    used_gb: float = Field(ge=0, le=10_000_000, allow_inf_nan=False)
+    raid: str = Field(default="", max_length=100)
+    notes: str = Field(default="", max_length=1000)
+    measured_at: OptDate = None
+
+    @field_validator("used_gb")
+    @classmethod
+    def _used_within_total(cls, v: float, info) -> float:
+        total = info.data.get("total_gb")
+        if total is not None and v > total:
+            raise ValueError("사용량은 전체 용량을 넘을 수 없습니다.")
+        return v
+
+
+class ServerGPUForm(FormModel):
+    gpu_model: str = Field(min_length=1, max_length=100)
+    quantity: int = Field(ge=1, le=16)
+    vram_gb: opt_int(1, 1024) = None
+    driver_version: Version = ""
+    cuda_version: Version = ""
+    mig_config: str = Field(default="", max_length=200)
+    nvlink: Checkbox = False
+    assigned_to: str = Field(default="", max_length=200)      # 비어 있으면 '미할당'
+    assign_note: str = Field(default="", max_length=1000)
+
+
+class HostServiceForm(FormModel):
+    name: str = Field(min_length=1, max_length=100)
+    run_type: Literal[*RUN_TYPES]
+    port: opt_int(1, 65535) = None
+    protocol: opt_choice(*PROTOCOLS) = ""
+    version: str = Field(default="", max_length=50)
+    description: str = Field(default="", max_length=1000)
+
+
+class ContainerForm(FormModel):
+    name: str = Field(min_length=1, max_length=100)
+    image: str = Field(min_length=1, max_length=300)
+    port_mappings: Annotated[str, AfterValidator(_port_mappings)] = Field(default="", max_length=300)
+    compose_project: str = Field(default="", max_length=100)
+    status: str = Field(default="", max_length=50)
+    description: str = Field(default="", max_length=1000)
+    gpu_usage: Literal[*GPU_USAGES] = "없음"
+    gpu_devices: str = Field(default="", max_length=50, validate_default=True)
+
+    @field_validator("gpu_devices")
+    @classmethod
+    def _devices(cls, v: str, info) -> str:
+        usage = info.data.get("gpu_usage")
+        v = re.sub(r"\s*,\s*", ",", v.strip())      # 쉼표 주변 공백만 허용 ('0 1'은 거부)
+        if v and not _DEVICES.fullmatch(v):
+            raise ValueError("디바이스 번호는 숫자와 쉼표만 사용할 수 있습니다 (예: 0,1).")
+        if usage == "특정 디바이스" and not v:
+            raise ValueError("'특정 디바이스'를 선택한 경우 번호를 입력하세요.")
+        return v if usage == "특정 디바이스" else ""         # 다른 값이면 서버측에서 비워 저장
+
+
+class ACLForm(FormModel):
+    direction: Literal[*ACL_DIRECTIONS]
+    src_cidr: Network
+    dst_cidr: Network
+    port: PortSpec
+    protocol: Literal[*PROTOCOLS]
+    purpose: str = Field(min_length=1, max_length=1000)
+    requester: str = Field(min_length=1, max_length=100)
+    requested_at: date
+    ticket_no: str = Field(default="", max_length=50)
+    status: Literal[*ACL_STATUSES]
+    expires_at: OptDate = None
+
+    @field_validator("expires_at")
+    @classmethod
+    def _expiry_after_request(cls, v, info):
+        requested = info.data.get("requested_at")
+        if v is not None and requested is not None and v < requested:
+            raise ValueError("만료일은 요청일보다 빠를 수 없습니다.")
+        return v

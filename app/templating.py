@@ -40,6 +40,7 @@ def usage_level(percent: float | None) -> str:
     return "red" if percent >= 90 else "orange" if percent >= 80 else "green"
 
 
+_env.filters["tuple_pair"] = lambda v: (v, v)    # select 옵션용 (값 == 표시)
 _env.filters["kst"] = kst
 _env.filters["kst_date"] = kst_date
 _env.globals.update(verify_state=assets.verify_state, usage_class=usage_class, usage_level=usage_level)

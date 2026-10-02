@@ -150,3 +150,33 @@
   </table>
 </section>
 {%- endmacro %}
+
+{# 선언형 폼 필드 (서버 하위 항목 등). f는 FormField 정의 #}
+{% macro generic_field(f, values, errors) -%}
+{% if f.kind == "checkbox" %}
+  {{ checkbox_field(f.name, f.label, values.get(f.name)) }}{{ field_error(errors, f.name) }}
+{% elif f.kind == "select" %}
+  {{ select_field(f.name, f.label, f.options | map("tuple_pair") | list, values, errors, required=f.required, blank=None if f.required else "선택 안 함") }}
+{% elif f.kind == "textarea" %}
+  {{ textarea_field(f.name, f.label, values, errors, rows=3, maxlength=f.maxlength, required=f.required) }}
+{% else %}
+<div class="field{% if errors and errors.get(f.name) %} has-error{% endif %}">
+  <label for="f-{{ f.name }}">{{ f.label }}{% if f.required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+  <input id="f-{{ f.name }}" name="{{ f.name }}" type="{{ f.kind }}" value="{{ values.get(f.name, '') }}"
+         {% if f.kind == "number" %}step="any"{% endif %}
+         {% if f.required %}required{% endif %}
+         {% if f.maxlength %}maxlength="{{ f.maxlength }}"{% endif %}
+         {% if f.datalist %}list="dl-{{ f.name }}"{% endif %}>
+  {% if f.datalist %}<datalist id="dl-{{ f.name }}">{% for o in f.datalist %}<option value="{{ o }}">{% endfor %}</datalist>{% endif %}
+  {{ field_error(errors, f.name) }}
+</div>
+{% endif %}
+{%- endmacro %}
+
+{# 표의 한 칸: cell은 {text, badge, usage, muted} #}
+{% macro item_cell(c) -%}
+{% if c.usage is not none %}{{ usage_bar(c.usage) }}
+{% elif c.badge %}{{ badge(c.text, c.badge) }}
+{% elif c.muted %}<span class="muted">{{ c.text }}</span>
+{% else %}{{ c.text }}{% endif %}
+{%- endmacro %}

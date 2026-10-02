@@ -34,6 +34,32 @@
   </dl>
 </section>
 
+{% for sec in sections %}
+<section class="section" id="{{ sec.spec.slug }}">
+  <div class="page-head">
+    <h2>{{ sec.spec.title }} ({{ sec.rows | length }})</h2>
+    {% if can_write %}<a class="button secondary" href="/servers/{{ s.id }}/{{ sec.spec.slug }}/new">추가</a>{% endif %}
+  </div>
+  {% if sec.spec.slug == "gpus" and gpu_total.gpus %}
+  <p>총 GPU <strong>{{ gpu_total.gpus }}장</strong> · 총 VRAM <strong>{{ gpu_total.vram }} GB</strong>
+     {% if gpu_total.unassigned %}{{ m.badge("미할당 " ~ gpu_total.unassigned ~ "행", "orange") }}{% endif %}</p>
+  {% endif %}
+  {% if sec.rows %}
+  <table>
+    <thead><tr>{% for h in sec.spec.headers %}<th>{{ h }}</th>{% endfor %}{% if can_write %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for row in sec.rows %}
+      <tr>
+        {% for c in row.cells %}<td>{{ m.item_cell(c) }}</td>{% endfor %}
+        {% if can_write %}<td><a href="/servers/{{ s.id }}/{{ sec.spec.slug }}/{{ row.id }}/edit">수정</a></td>{% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">등록된 항목이 없습니다.</p>{% endif %}
+</section>
+{% endfor %}
+
 {{ m.notes_section(notes, "/servers/%d" % s.id, can_write, user, csrf_token, today) }}
 {{ m.history_section(history) }}
 {% endblock %}
