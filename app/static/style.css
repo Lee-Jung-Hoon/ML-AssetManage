@@ -80,3 +80,4 @@ a.button.secondary { background: #fff; color: #1f2933; border: 1px solid #b8c2cc
 .warn-box { padding: 10px 14px; background: #fff4e0; border: 1px solid #f0c987; border-radius: 4px; margin: 12px 0; }
 .inline-form { display: inline; margin: 0; }
 .inline-form button { padding: 2px 8px; font-size: 12px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

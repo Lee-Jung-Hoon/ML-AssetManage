@@ -12,7 +12,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import config, db, security
 from .routers import audit as audit_router
-from .routers import auth, dashboard, licenses, models, server_items, servers, services, users
+from .routers import (auth, dashboard, licenses, models, search, server_items, servers, services, tags,
+                      users)
 from .security import LoginRequired, PasswordChangeRequired, safe_redirect_path
 from .templating import render
 
@@ -117,6 +118,8 @@ def create_app() -> FastAPI:
     app.include_router(licenses.common_router)
     app.include_router(models.router)
     app.include_router(models.common_router)
+    app.include_router(search.router)
+    app.include_router(tags.router)
     app.include_router(audit_router.router)
     app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 

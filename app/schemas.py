@@ -770,3 +770,22 @@ class ModelServiceCreateForm(FormModel):
 
 class ModelServiceEditForm(FormModel):
     note: str = Field(default="", max_length=500)
+
+
+# ------------------------------------------------------------------ 통합 검색 / 태그 관리 (10단계)
+SEARCH_MIN, SEARCH_MAX = 2, 100
+
+
+class SearchQuery(FormModel):
+    q: str = Field(min_length=SEARCH_MIN, max_length=SEARCH_MAX)
+
+
+def _single_tag(value: str) -> str:
+    tags = parse_tags(value)
+    if len(tags) != 1:
+        raise ValueError("태그 이름 하나를 입력하세요 (쉼표 없이).")
+    return tags[0]
+
+
+class TagRenameForm(FormModel):
+    name: Annotated[str, Field(min_length=1, max_length=60), AfterValidator(_single_tag)]

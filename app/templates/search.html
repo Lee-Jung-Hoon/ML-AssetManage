@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% import "macros.html" as m %}
+{% block title %}통합 검색{% endblock %}
+{% block content %}
+<h1>통합 검색</h1>
+<form class="filters" method="get" action="/search">
+  <div class="field"><label for="q">검색어 ({{ min }}~{{ max }}자)</label>
+    <input id="q" type="search" name="q" value="{{ q }}" minlength="{{ min }}" maxlength="{{ max }}" required></div>
+  <button type="submit">검색</button>
+</form>
+<p class="muted">서버(이름·호스트명·IP), 서비스(이름·코드·도메인), AI 모델(이름·베이스 모델), GPU 모델, 라이선스(이름·CN·SAN·AI API 제공사), 컨테이너(이름·이미지), 태그를 검색합니다. 라이선스 키 등 민감 정보는 검색 대상이 아닙니다.</p>
+{% if error %}<div class="flash flash-error" role="alert">{{ error }}</div>{% endif %}
+
+{% if groups %}
+  {% if empty %}<p>"{{ q }}"에 대한 검색 결과가 없습니다.</p>{% endif %}
+
+  {% if acls %}
+  <section class="section" id="acls">
+    <h2>이 IP({{ ip }})가 포함되는 ACL ({{ acl_total }}건{% if acl_total > limit %}, 최대 {{ limit }}건 표시{% endif %})</h2>
+    <table>
+      <thead><tr><th>서버</th><th>방향</th><th>출발지</th><th>목적지</th><th>포트</th><th>상태</th><th>일치</th><th>목적/사유</th></tr></thead>
+      <tbody>{% for a in acls %}
+        <tr><td><a href="/servers/{{ a.server_id }}#acls">{{ a.server_name }}</a></td><td>{{ a.direction }}</td><td>{{ a.src_cidr }}</td><td>{{ a.dst_cidr }}</td>
+            <td>{{ a.port_start if a.port_start == a.port_end else "%d-%d" % (a.port_start, a.port_end) }}/{{ a.protocol }}</td>
+            <td>{{ a.status }}</td><td>{{ a.matched }}</td><td>{{ a.purpose }}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {% macro count_note(g) %}{{ g.total }}건{% if g.total > limit %} (최대 {{ limit }}건 표시){% endif %}{% endmacro %}
+
+  {% if groups.servers.total %}
+  <section class="section" id="servers"><h2>서버 ({{ count_note(groups.servers) }})</h2>
+    <table><thead><tr><th>서버</th><th>호스트명</th><th>상태</th><th>일치한 IP</th></tr></thead><tbody>
+    {% for r in groups.servers.rows %}<tr><td><a href="/servers/{{ r.id }}">{{ r.name }}</a></td><td>{{ r.hostname }}</td><td>{{ r.status }}</td><td>{{ r.matched_ip or "" }}</td></tr>{% endfor %}
+    </tbody></table></section>
+  {% endif %}
+
+  {% if groups.services.total %}
+  <section class="section" id="services"><h2>서비스 ({{ count_note(groups.services) }})</h2>
+    <table><thead><tr><th>코드</th><th>서비스</th><th>중요도</th><th>상태</th></tr></thead><tbody>
+    {% for r in groups.services.rows %}<tr><td>{{ r.code }}</td><td><a href="/services/{{ r.id }}">{{ r.name }}</a></td><td>{{ m.tier_badge(r.tier) }}</td><td>{{ r.status }}</td></tr>{% endfor %}
+    </tbody></table></section>
+  {% endif %}
+
+  {% if groups.models.total %}
+  <section class="section" id="models"><h2>AI 모델 ({{ count_note(groups.models) }})</h2>
+    <table><thead><tr><th>모델</th><th>버전</th><th>베이스 모델</th><th>상태</th></tr></thead><tbody>
+    {% for r in groups.models.rows %}<tr><td><a href="/models/{{ r.id }}">{{ r.name }}</a></td><td>{{ r.version }}</td><td>{{ r.base_model }}</td><td>{{ r.status }}</td></tr>{% endfor %}
+    </tbody></table></section>
+  {% endif %}
+
+  {% if groups.gpus.total %}
+  <section class="section" id="gpus"><h2>GPU ({{ count_note(groups.gpus) }})</h2>
+    <table><thead><tr><th>GPU 모델</th><th>수량</th><th>서버</th><th>할당 대상</th></tr></thead><tbody>
+    {% for r in groups.gpus.rows %}<tr><td>{{ r.gpu_model }}</td><td>×{{ r.quantity }}</td><td><a href="/servers/{{ r.id }}#gpus">{{ r.name }}</a> <span class="muted">({{ r.hostname }})</span></td><td>{{ r.assigned_to or "미할당" }}</td></tr>{% endfor %}
+    </tbody></table></section>
+  {% endif %}
+
+  {% if groups.licenses.total %}
+  <section class="section" id="licenses"><h2>라이선스 ({{ count_note(groups.licenses) }})</h2>
+    <table><thead><tr><th>이름</th><th>종류</th><th>만료일</th><th>상태</th></tr></thead><tbody>
+    {% for r in groups.licenses.rows %}<tr><td><a href="/licenses/{{ r.id }}">{{ r.name }}</a></td><td>{{ r.license_type }}{% if r.ai_provider %} <span class="muted">({{ r.ai_provider }})</span>{% endif %}</td>
+      <td>{{ r.expires_at or "만료 없음" }}</td><td>{{ m.license_badge(r.status) }} {{ m.policy_badge(r.policy_risk) }}</td></tr>{% endfor %}
+    </tbody></table></section>
+  {% endif %}
+
+  {% if groups.containers.total %}
+  <section class="section" id="containers"><h2>컨테이너 ({{ count_note(groups.containers) }})</h2>
+    <table><thead><tr><th>컨테이너</th><th>이미지</th><th>서버</th></tr></thead><tbody>
+    {% for r in groups.containers.rows %}<tr><td>{{ r.name }}</td><td>{{ r.image }}</td><td><a href="/servers/{{ r.id }}#containers">{{ r.server_name }}</a></td></tr>{% endfor %}
+    </tbody></table></section>
+  {% endif %}
+
+  {% if groups.tags.total %}
+  <section class="section" id="tags"><h2>태그 ({{ count_note(groups.tags) }})</h2>
+    <table><thead><tr><th>태그</th><th>종류</th><th>자산</th></tr></thead><tbody>
+    {% for r in groups.tags.rows %}<tr><td>{{ m.tag_list([r.tag]) }}</td>
+      <td>{{ {"server": "서버", "service": "서비스", "model": "AI 모델", "license": "라이선스"}[r.kind] }}</td>
+      <td><a href="{{ r.url }}">{{ r.name }}</a></td></tr>{% endfor %}
+    </tbody></table></section>
+  {% endif %}
+{% endif %}
+{% endblock %}
