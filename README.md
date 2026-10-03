@@ -246,6 +246,17 @@ Uvicorn은 `--proxy-headers --forwarded-allow-ips="*"`로 구동됩니다.
 | CSV 일괄 등록 미리보기 (행별 오류 사유) | [20-bulk-import-preview](docs/screenshots/20-bulk-import-preview.png) |
 | 사용자 관리 / 감사 로그 / 백업 / 오류 페이지 | [21](docs/screenshots/21-users.png) · [22](docs/screenshots/22-audit-log.png) · [23](docs/screenshots/23-backup.png) · [24](docs/screenshots/24-error-404.png) |
 
+**반응형 (모바일 390px / 태블릿 820px, 라이트·다크)** — `docs/screenshots/responsive/`. 720px 이하에서는 사이드바가 가로 메뉴로, 폼·상세가 한 열로 바뀌고, 1024px 이하에서는 표가 가로 스크롤됩니다.
+
+| 화면 | 모바일 (라이트) | 모바일 (다크) | 태블릿 |
+|---|---|---|---|
+| 로그인 | [보기](docs/screenshots/responsive/mobile-light-01-login.png) | [보기](docs/screenshots/responsive/mobile-dark-01-login.png) | [보기](docs/screenshots/responsive/tablet-light-01-login.png) |
+| 대시보드 | [보기](docs/screenshots/responsive/mobile-light-02-dashboard.png) | [보기](docs/screenshots/responsive/mobile-dark-02-dashboard.png) | [보기](docs/screenshots/responsive/tablet-light-02-dashboard.png) |
+| 서버 목록 | [보기](docs/screenshots/responsive/mobile-light-03-servers.png) | [보기](docs/screenshots/responsive/mobile-dark-03-servers.png) | [보기](docs/screenshots/responsive/tablet-light-03-servers.png) |
+| 서버 상세 | [보기](docs/screenshots/responsive/mobile-light-04-server-detail.png) | [보기](docs/screenshots/responsive/mobile-dark-04-server-detail.png) | [보기](docs/screenshots/responsive/tablet-light-04-server-detail.png) |
+| 라이선스 목록 | [보기](docs/screenshots/responsive/mobile-light-05-licenses.png) | [보기](docs/screenshots/responsive/mobile-dark-05-licenses.png) | [보기](docs/screenshots/responsive/tablet-light-05-licenses.png) |
+| 서버 등록 폼 | [보기](docs/screenshots/responsive/mobile-light-06-server-form.png) | [보기](docs/screenshots/responsive/mobile-dark-06-server-form.png) | [보기](docs/screenshots/responsive/tablet-light-06-server-form.png) |
+
 ## 10. 개발
 
 ```bash
