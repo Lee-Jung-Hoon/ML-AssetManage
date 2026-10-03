@@ -146,13 +146,40 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
 .dash-grid h3 { margin: 0 0 6px; }
 
-@media (max-width: 800px) {
-  .layout { flex-direction: column; }
-  .sidebar { width: auto; flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); padding: 8px 12px; }
-  .content { padding: 20px 16px 40px; }
+/* 반응형: 태블릿(<=1024px) -> 모바일(<=720px). 표는 가로 스크롤로 처리한다. */
+.dash-grid { grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); }
+.table-wrap { overflow-x: auto; }
+@media (max-width: 1024px) {
+  .content { padding: 24px 24px 40px; }
+  .sidebar { width: 176px; }
+  .topbar .search { max-width: none; }
+  table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  th, td { padding: 9px 12px; }
+}
+@media (max-width: 720px) {
+  body { font-size: 15px; }
+  input, select, textarea { font-size: 16px; }
+  button, a.button { padding: 9px 14px; }
+  .topbar { flex-wrap: wrap; height: auto; gap: 8px 12px; padding: 10px 14px; }
+  .topbar .search { order: 3; flex: 1 0 100%; }
+  .userbox { gap: 8px; }
+  .layout { flex-direction: column; min-height: 0; }
+  .sidebar { width: auto; flex-direction: row; gap: 4px; padding: 8px 10px; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); -webkit-overflow-scrolling: touch; }
+  .sidebar a { white-space: nowrap; padding: 8px 12px; }
+  .content { padding: 18px 14px 36px; }
+  .content.narrow { margin: 24px 14px; padding: 22px; max-width: none; }
+  h1 { font-size: 20px; }
+  .page-head { flex-direction: column; align-items: flex-start; }
   .form-grid { grid-template-columns: 1fr; }
-  .detail-grid { grid-template-columns: 1fr; gap: 2px; }
-  .detail-grid dd { margin-bottom: 8px; }
-  .topbar { gap: 10px; padding: 0 12px; }
-  table { display: block; overflow-x: auto; }
+  .form-narrow, .form-wide { max-width: none; }
+  .filters { flex-direction: column; align-items: stretch; }
+  .filters .field { width: 100%; }
+  .filters .field > input, .filters .field > select { width: 100%; }
+  .detail-grid { grid-template-columns: 1fr; gap: 2px; padding: 14px 16px; }
+  .detail-grid dd { margin-bottom: 10px; }
+  .cards { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .card-num { font-size: 24px; }
+  .dash-grid { grid-template-columns: 1fr; }
+  th, td.nowrap { white-space: nowrap; }
+  .pagination { gap: 10px; flex-wrap: wrap; }
 }
